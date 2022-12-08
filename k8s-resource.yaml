@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1234
+      imagePullPolicy: Never
+      envFrom:
+        - secretRef:
+            name: "128Mi"
+        - configMapRef:
+            name: "500m"
+      env:
+        - name: YELOO
+          valueFrom:
+            configMapKeyRef:
+              key: "128Mi"
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+      ports:
+        - containerPort: 80
