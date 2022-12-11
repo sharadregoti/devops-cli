@@ -1,71 +1,26 @@
+// Demo code for the Table primitive.
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/fatih/color"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-
-	"k8s.io/client-go/kubernetes/scheme"
+	"github.com/sharadregoti/devops/internal/transformer"
+	"github.com/sharadregoti/devops/internal/views"
 )
 
 func main() {
 
-	// consolescanner := bufio.NewScanner(os.Stdin)
+	// p := plugin.New()
 
-	// Check if any arguments were passed
-	if len(os.Args) == 1 {
-		fmt.Println("No arguments were passed.")
-		return
-	}
+	p := initPlugin()
+	app := views.NewApplication()
 
-	// Print the command-line arguments
-	// for i, arg := range os.Args[1:] {
-	// 	fmt.Printf("Argument %d: %s\n", i+1, arg)
-	// }
+	schema := p.GetResourceTypeSchema("pods")
 
-	f, err := os.ReadFile(os.Args[1])
-	if err != nil {
-		log.Fatal(err)
-	}
+	table := transformer.GetResourceInTableFormat(&schema, p.GetResources("pods"))
 
-	// fmt.Println(consolescanner.Text())
+	app.MainView.Refresh(table)
+	app.GeneralInfoView.Refresh(p.GetGeneralInfo())
+	app.IsolatorView.Refresh(map[string]string{"ctrl-d": p.GetDefaultResourceIsolator()})
+	app.PluginView.Refresh(map[string]string{"ctrl-a": p.Name(), "ctrl-b": p.Name()})
 
-	obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(f, nil, nil)
-
-	if err != nil {
-		log.Fatalf(fmt.Sprintf("Error while decoding YAML object. Err was: %s", err))
-		return
-	}
-
-	// now use switch over the type of the object
-	// and match each type-case
-	switch o := obj.(type) {
-	case *v1.Pod:
-		if o.Namespace == "" {
-			o.Namespace = "default"
-		}
-		findngs, err := podCheck(o.Namespace, &o.Spec)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		color.Green("Findings")
-		// Print the list of strings
-		for i, item := range findngs {
-			fmt.Printf("%d: %s\n", i+1, item)
-		}
-
-	case *appsv1.Deployment:
-		podCheck(o.Namespace, &o.Spec.Template.Spec)
-	case *appsv1.StatefulSet:
-		podCheck(o.Namespace, &o.Spec.Template.Spec)
-	case *appsv1.DaemonSet:
-		podCheck(o.Namespace, &o.Spec.Template.Spec)
-	default:
-		fmt.Printf("Type %v is unknown", o)
-	}
+	app.Start()
 }

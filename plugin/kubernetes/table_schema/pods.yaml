@@ -1,0 +1,34 @@
+operations:
+  - name: "namespace"
+    json_paths: 
+    - path: "metadata.namespace"
+    output_format: ""
+  - name: "name"
+    json_paths: 
+    - path: "metadata.name"
+    output_format: ""
+  - name: "ready"
+    json_paths:
+    - path: "status.containerStatuses.#(ready==true)#|#"
+    - path: "status.containerStatuses.#"
+    output_format: "%v/%v"
+  - name: "restarts"
+    json_paths:
+    - path: "status.containerStatuses.0.restartCount"
+    output_format: ""
+  - name: "status"
+    json_paths: 
+    - path: "status.phase"
+    output_format: ""
+  - name: "ip"
+    json_paths: 
+    - path: "status.podIP"
+    output_format: ""
+  - name: "node"
+    json_paths: 
+    - path: "spec.nodeName"
+    output_format: ""
+  - name: "age"
+    json_paths: 
+    - path: ""
+    output_format: ""

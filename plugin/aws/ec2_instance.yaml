@@ -1,0 +1,10 @@
+operations:
+  - src_column: "tags"
+    name: "Name"
+    json_path: "Name"
+  - src_column: "instance_id"
+    name: "InstanceId"
+    son_path: ""
+  - src_column: "instance_type"
+    name: "InstanceType"
+    json_path: ""
