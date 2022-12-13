@@ -15,6 +15,6 @@ func (p *DevopsPlugin) Server(*plugin.MuxBroker) (interface{}, error) {
 }
 
 func (DevopsPlugin) Client(b *plugin.MuxBroker, c *rpc.Client) (interface{}, error) {
-	// var _ Devops = &DevopsClientRPC{}
+	var _ Devops = &DevopsClientRPC{}
 	return &DevopsClientRPC{client: c}, nil
 }

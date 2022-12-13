@@ -2,12 +2,16 @@ package kubernetes
 
 import (
 	"context"
+	"io/ioutil"
+	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/shared"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -16,11 +20,16 @@ import (
 )
 
 type Kubernetes struct {
-	logger          hclog.Logger
-	normalClient    *kubernetes.Clientset
-	dynamicClient   dynamic.Interface
-	clientConfig    clientcmdapi.Config
-	resourceTypeMap resourceTypeList
+	lock sync.RWMutex
+
+	// Key is resource type
+	resourceChanMap       map[string]chan shared.WatchResourceResult
+	logger                hclog.Logger
+	normalClient          *kubernetes.Clientset
+	dynamicClient         dynamic.Interface
+	clientConfig          clientcmdapi.Config
+	resourceTypeMap       resourceTypeList
+	resourceSchemaTypeMap map[string]model.ResourceTransfomer
 }
 
 type resourceTypeList map[string]*resourceTypeInfo
@@ -80,12 +89,36 @@ func New(logger hclog.Logger) *Kubernetes {
 		}
 	}
 
+	// Read all resource type scheam
+	files, err := ioutil.ReadDir("plugin/kubernetes/table_schema")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resourceSchemaTypeMap := map[string]model.ResourceTransfomer{}
+	for _, f := range files {
+		data, err := os.ReadFile("plugin/kubernetes/table_schema/" + f.Name())
+		if err != nil {
+			panic(err)
+		}
+
+		res := new(model.ResourceTransfomer)
+		if err := yaml.Unmarshal(data, res); err != nil {
+			panic(err)
+		}
+		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = *res
+	}
+
+	logger.Info("Fuck", resourceSchemaTypeMap)
+
 	return &Kubernetes{
-		logger:          logger,
-		normalClient:    clientset,
-		dynamicClient:   dynamicClient,
-		clientConfig:    cc,
-		resourceTypeMap: resourceTypeMap,
+		logger:                logger,
+		normalClient:          clientset,
+		dynamicClient:         dynamicClient,
+		clientConfig:          cc,
+		resourceTypeMap:       resourceTypeMap,
+		resourceChanMap:       make(map[string]chan shared.WatchResourceResult),
+		resourceSchemaTypeMap: resourceSchemaTypeMap,
 	}
 }
 
@@ -95,25 +128,66 @@ func (d *Kubernetes) Name() string {
 
 func (d *Kubernetes) GetResources(resourceType string) []interface{} {
 	r := d.resourceTypeMap[resourceType]
-	items, err := getResourcesDynamically(d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
+	items, err := listResourcesDynamically(d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
 	if err != nil {
 		panic(err)
 	}
 	return items
 }
 
+func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
+	res, ok := d.resourceChanMap[resourceType]
+	if !ok {
+		d.logger.Debug("Channel for resource type does not exists", resourceType)
+		return nil
+	}
+
+	d.logger.Debug("Closing resource watcher", resourceType)
+	close(res)
+	return nil
+}
+
+func (d *Kubernetes) WatchResources(resourceType string) chan shared.WatchResourceResult {
+	res, ok := d.resourceChanMap[resourceType]
+	if ok {
+		// Send it
+		d.logger.Debug("Channel already exists for resource", resourceType)
+		return res
+	}
+
+	d.logger.Debug("Creating a new channel for resource", resourceType)
+	d.lock.Lock()
+	c := make(chan shared.WatchResourceResult, 1)
+	d.resourceChanMap[resourceType] = c
+	d.lock.Unlock()
+
+	go func() {
+		r := d.resourceTypeMap[resourceType]
+		err := getResourcesDynamically(c, d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	return c
+}
+
 func (d *Kubernetes) GetResourceTypeSchema(resourceType string) model.ResourceTransfomer {
-	data, err := os.ReadFile("plugin/kubernetes/table_schema/pods.yaml")
-	if err != nil {
-		panic(err)
+	t, ok := d.resourceSchemaTypeMap[resourceType]
+	if !ok {
+		return d.resourceSchemaTypeMap["defaults"]
 	}
+	// data, err := os.ReadFile("plugin/kubernetes/table_schema/pods.yaml")
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	res := new(model.ResourceTransfomer)
-	if err := yaml.Unmarshal(data, res); err != nil {
-		panic(err)
-	}
+	// res := new(model.ResourceTransfomer)
+	// if err := yaml.Unmarshal(data, res); err != nil {
+	// 	panic(err)
+	// }
 
-	return *res
+	return t
 }
 
 func (d *Kubernetes) GetResourceTypeList() []string {

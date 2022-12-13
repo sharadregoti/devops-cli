@@ -12,6 +12,8 @@ type Devops interface {
 
 type MainBox interface {
 	GetResources(resourceType string) []interface{}
+	WatchResources(resourceType string) chan WatchResourceResult
+	CloseResourceWatcher(resourceType string) error
 	GetResourceTypeSchema(resourceType string) model.ResourceTransfomer
 }
 
@@ -26,4 +28,12 @@ type GeneralInfoBox interface {
 type ResourceIsolatorBox interface {
 	GetResourceIsolatorType() string
 	GetDefaultResourceIsolator() string
+}
+
+type DebuggingBox interface {
+	GetResourceTypeConditions()
+}
+
+type ChatGPTBox interface {
+	GetResourceTypeConditions()
 }

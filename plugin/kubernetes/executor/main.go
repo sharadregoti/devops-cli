@@ -21,7 +21,7 @@ func main() {
 	// fmt.Println(d.GetGeneralInfo())
 	// fmt.Println(d.Name())
 	// fmt.Println(d.GetResourceTypeList())
-	fmt.Println(len(d.GetResources("configmaps")))
+	fmt.Println(len(d.GetResources("pods")))
 }
 
 // package main

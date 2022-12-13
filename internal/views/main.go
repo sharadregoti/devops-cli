@@ -13,6 +13,9 @@ func NewMainView() *MainView {
 	table := tview.NewTable().SetFixed(0, 0)
 	table.SetBorder(true).SetBorderAttributes(tcell.AttrDim).SetTitle("Table")
 	table.SetSelectable(true, false)
+	table.SetFocusFunc(func() {
+		table.Select(1, 1)
+	})
 
 	return &MainView{
 		view: table,
@@ -24,6 +27,9 @@ func (m *MainView) GetView() *tview.Table {
 }
 
 func (m *MainView) Refresh(data [][]string) {
+	m.GetView().Clear()
+	// m.GetView().getre
+
 	for r, cols := range data {
 		for c, col := range cols {
 			// Set header

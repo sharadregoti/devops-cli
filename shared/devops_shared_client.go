@@ -28,6 +28,26 @@ func (d *DevopsClientRPC) GetResources(resourceType string) []interface{} {
 	return resp
 }
 
+func (d *DevopsClientRPC) WatchResources(resourceType string) chan WatchResourceResult {
+	var resp = make(chan WatchResourceResult, 1)
+	err := d.client.Call("Plugin.WatchResources", &resourceType, &resp)
+	if err != nil {
+		panic(err)
+	}
+
+	return resp
+}
+
+func (d *DevopsClientRPC) CloseResourceWatcher(resourceType string) error {
+	var er error
+	err := d.client.Call("Plugin.CloseResourceWatcher", &resourceType, &er)
+	if err != nil {
+		panic(err)
+	}
+
+	return er
+}
+
 func (d *DevopsClientRPC) GetResourceTypeSchema(resourceType string) model.ResourceTransfomer {
 	var resp model.ResourceTransfomer
 	err := d.client.Call("Plugin.GetResourceTypeSchema", &resourceType, &resp)

@@ -6,7 +6,8 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-	aws "github.com/sharadregoti/devops/plugin/aws"
+
+	// aws "github.com/sharadregoti/devops/plugin/aws"
 	pnk8s "github.com/sharadregoti/devops/plugin/kubernetes"
 	"github.com/sharadregoti/devops/shared"
 )
@@ -31,14 +32,15 @@ func main() {
 
 	gob.Register(map[string]interface{}{})
 	gob.Register([]interface{}{})
+	gob.Register(make(chan shared.WatchResourceResult))
 
-	a := &aws.AWS{}
+	// a := &aws.AWS{}
 
 	pluginK8s := pnk8s.New(logger)
 
 	// pluginMap is the map of plugins we can dispense.
 	var pluginMap = map[string]plugin.Plugin{
-		"aws":        &shared.DevopsPlugin{Impl: a},
+		// "aws":        &shared.DevopsPlugin{Impl: a},
 		"kubernetes": &shared.DevopsPlugin{Impl: pluginK8s},
 	}
 

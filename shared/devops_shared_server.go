@@ -14,6 +14,16 @@ func (d *DevopsServerRPC) GetResources(args *string, resp *[]interface{}) error 
 	return nil
 }
 
+func (d *DevopsServerRPC) WatchResources(args *string, resp *chan WatchResourceResult) error {
+	*resp = d.Impl.WatchResources(*args)
+	return nil
+}
+
+func (d *DevopsServerRPC) CloseResourceWatcher(args *string, resp *error) error {
+	*resp = d.Impl.CloseResourceWatcher(*args)
+	return nil
+}
+
 func (d *DevopsServerRPC) GetResourceTypeSchema(args *string, resp *model.ResourceTransfomer) error {
 	*resp = d.Impl.GetResourceTypeSchema(*args)
 	return nil

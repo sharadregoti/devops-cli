@@ -11,7 +11,7 @@ import (
 	"github.com/sharadregoti/devops/shared"
 )
 
-func initPlugin() shared.Devops {
+func installPlugins() shared.Devops {
 	// Create an hclog.Logger
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:   "devops-client",
@@ -21,6 +21,7 @@ func initPlugin() shared.Devops {
 
 	gob.Register(map[string]interface{}{})
 	gob.Register([]interface{}{})
+	gob.Register(make(chan shared.WatchResourceResult))
 
 	// We're a host! Start by launching the plugin process.
 	client := plugin.NewClient(&plugin.ClientConfig{

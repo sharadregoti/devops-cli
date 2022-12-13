@@ -1,7 +1,9 @@
 package views
 
 import (
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"github.com/sharadregoti/devops/model"
 )
 
 type Application struct {
@@ -11,12 +13,14 @@ type Application struct {
 	SearchView      *SearchView
 	IsolatorView    *IsolatorView
 	PluginView      *PluginView
+	eventChan       chan model.Event
+	application     *tview.Application
 }
 
-func NewApplication() *Application {
+func NewApplication(c chan model.Event) *Application {
 	m := NewMainView()
 	g := NewGeneralInfo()
-	s := NewSearchView()
+	s := NewSearchView(c)
 	i := NewIsolatorView()
 	p := NewPluginView()
 
@@ -28,34 +32,49 @@ func NewApplication() *Application {
 	rootFlexContainer := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(global, 6, 1, false).
-		AddItem(m.GetView(), 0, 1, true).
-		AddItem(s.GetView(), 2, 1, false)
+		AddItem(m.GetView(), 0, 1, false).
+		AddItem(s.GetView(), 0, 0, false) // Default disable
 
-	// rootFlexContainer.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	a := tview.NewApplication().SetRoot(rootFlexContainer, true)
 
-	// 	tcell.NewEventKey(tcell.Key(tcell.ModShift), ':', tcell.ModAlt)
-
-	// 	if event.Key() == tcell.KeyCtrlB {
-	// 		rootFlexContainer.RemoveItem(fixedSearchBox)
-	// 	}
-
-	// 	if event.Key() == tcell.KeyCtrlA {
-	// 		rootFlexContainer.AddItem(fixedSearchBox, 2, 1, false)
-	// 	}
-
-	// 	return event
-	// })
-
-	return &Application{
+	r := &Application{
 		rootView:        rootFlexContainer,
 		MainView:        m,
 		GeneralInfoView: g,
 		SearchView:      s,
 		IsolatorView:    i,
 		PluginView:      p,
+		eventChan:       c,
+		application:     a,
 	}
+
+	r.SetKeyboardShortCuts()
+
+	return r
+}
+
+func (a *Application) GetApp() *tview.Application {
+	return a.application
+}
+
+func (a *Application) SetKeyboardShortCuts() {
+	a.rootView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+
+		if event.Key() == tcell.KeyCtrlA {
+			if a.rootView.GetItemCount() == 2 {
+				a.rootView.AddItem(a.SearchView.GetView(), 2, 1, true)
+				a.application.SetFocus(a.SearchView.GetView())
+			} else {
+				a.rootView.RemoveItem(a.SearchView.GetView())
+				a.application.SetFocus(a.MainView.GetView())
+			}
+			return event
+		}
+
+		return event
+	})
 }
 
 func (a *Application) Start() error {
-	return tview.NewApplication().SetRoot(a.rootView, true).Run()
+	return a.application.EnableMouse(true).Run()
 }
