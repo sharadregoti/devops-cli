@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	k "github.com/sharadregoti/devops/plugin/kubernetes"
+	"github.com/sharadregoti/devops/shared"
 )
 
 func main() {
@@ -15,13 +16,16 @@ func main() {
 		JSONFormat: true,
 	})
 
-	d := k.New(logger)
+	d, err := k.New(logger)
+	fmt.Println(err)
 
 	// k := New(logger)
 	// fmt.Println(d.GetGeneralInfo())
 	// fmt.Println(d.Name())
 	// fmt.Println(d.GetResourceTypeList())
-	fmt.Println(len(d.GetResources("pods")))
+	// d.DescribeResource()
+	res, _ := d.GetResources(shared.GetResourcesArgs{ResourceType: "namespaces", IsolatorID: ""})
+	fmt.Println(len(res))
 }
 
 // package main

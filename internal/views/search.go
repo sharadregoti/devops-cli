@@ -15,21 +15,12 @@ type SearchView struct {
 func NewSearchView(c chan model.Event) *SearchView {
 	searchBox := tview.NewInputField()
 	searchBox.SetFieldBackgroundColor(tcell.Color100)
-	searchBox.SetDoneFunc(func(key tcell.Key) {
-		// searchBox.Autocomplete().Blur()
+	searchBox.Autocomplete().SetDoneFunc(func(key tcell.Key) {
 		c <- model.Event{
-			Type:         "search-complete",
+			Type:         model.ResourceTypeChanged,
 			ResourceType: searchBox.GetText(),
 		}
-		// searchBox.SetText("")
-		// searchBox.Blur()
-	})
-	// searchBox.auto(tcell.Color100)
-	searchBox.SetDoneFunc(func(key tcell.Key) {
-		c <- model.Event{
-			Type:         "search-complete",
-			ResourceType: searchBox.GetText(),
-		}
+		searchBox.SetText("")
 	})
 
 	// searchBox.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -98,11 +89,3 @@ func (s *SearchView) SetResourceTypes(arr []string) {
 		return
 	})
 }
-
-// func (s *Search) Refresh(data map[string]string) {
-// 	s.view.Clear()
-
-// 	for k, v := range data {
-// 		s.view.AddItem(fmt.Sprintf("%s:%s", k, v), "", ' ', nil)
-// 	}
-// }

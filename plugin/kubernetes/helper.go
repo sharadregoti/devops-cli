@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"github.com/sharadregoti/devops/shared"
@@ -13,14 +14,13 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.Interface, ctx context.Context,
-	group string, version string, resource string, namespace string) error {
-
+func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.Interface, ctx context.Context, group string, version string, resource string, namespace string) error {
 	resourceId := schema.GroupVersionResource{
 		Group:    group,
 		Version:  version,
 		Resource: resource,
 	}
+
 	fmt.Println(group, ":", version, ":", resource, ":", namespace, ":", resourceId)
 	list, err := dynamic.Resource(resourceId).Namespace(namespace).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -70,6 +70,44 @@ func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.
 	// }
 
 	return nil
+}
+
+func (d *Kubernetes) DescribeResource(resourceType, resourceName, namespace string) (string, error) {
+	// Set the command to execute
+	command := "kubectl"
+	arguments := []string{"describe", resourceType, resourceName, "-n", namespace}
+
+	// Execute the command
+	output, err := exec.Command(command, arguments...).Output()
+	if err != nil {
+		d.logger.Error("failed to execute describe command", arguments, err)
+		return "", err
+	}
+
+	// Print the command output
+	return string(output), nil
+}
+
+// func (d *Kubernetes) getLogs(dynamic dynamic.Interface, ctx context.Context, group string, version string, resource string, namespace string, resourceName string) error {
+// 	r := d.normalClient.CoreV1().Pods("").GetLogs("", &v1.PodLogOptions{})
+// 	d.normalClient.CoreV1()
+// 	res := r.Do(ctx)
+// 	// res.
+// }
+
+func deleteResourcesDynamically(dynamic dynamic.Interface, ctx context.Context, group string, version string, resource string, namespace string, resourceName string) error {
+	resourceId := schema.GroupVersionResource{
+		Group:    group,
+		Version:  version,
+		Resource: resource,
+	}
+
+	err := dynamic.Resource(resourceId).Namespace(namespace).Delete(ctx, resourceName, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 func listResourcesDynamically(dynamic dynamic.Interface, ctx context.Context, group string, version string, resource string, namespace string) ([]interface{}, error) {

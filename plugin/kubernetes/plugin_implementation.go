@@ -2,8 +2,8 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"sync"
@@ -14,6 +14,7 @@ import (
 	"github.com/sharadregoti/devops/shared"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -22,14 +23,26 @@ import (
 type Kubernetes struct {
 	lock sync.RWMutex
 
+	logger hclog.Logger
+
+	// Clients
+	normalClient  *kubernetes.Clientset
+	dynamicClient dynamic.Interface
+
+	config *rest.Config
+
+	// Kube Config Parser
+	clientConfig clientcmdapi.Config
+
+	// Key is resource type, All resources are stored in their plural form
+	resourceTypeMap resourceTypeList
+
+	// Stores mapping of resource types corresponding to a schema defined in file
 	// Key is resource type
-	resourceChanMap       map[string]chan shared.WatchResourceResult
-	logger                hclog.Logger
-	normalClient          *kubernetes.Clientset
-	dynamicClient         dynamic.Interface
-	clientConfig          clientcmdapi.Config
-	resourceTypeMap       resourceTypeList
 	resourceSchemaTypeMap map[string]model.ResourceTransfomer
+
+	// Key is resource type
+	resourceChanMap map[string]chan shared.WatchResourceResult
 }
 
 type resourceTypeList map[string]*resourceTypeInfo
@@ -38,33 +51,33 @@ type resourceTypeInfo struct {
 	group            string
 	version          string
 	resourceTypeName string
+	isNamespaced     bool
 }
 
-func New(logger hclog.Logger) *Kubernetes {
-	logger = logger.ResetNamed("kubernetes")
+func New(logger hclog.Logger) (*Kubernetes, error) {
 	config := ctrl.GetConfigOrDie()
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to load kube config: %w", err)
 	}
 
 	// Create a dynamic client
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to load dynamic kube config: %w", err)
 	}
 
 	cc, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{},
 		&clientcmd.ConfigOverrides{}).RawConfig()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to load kubernetes context: %w", err)
 	}
 
 	// List all supported resources
 	resources, err := clientset.Discovery().ServerPreferredResources()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to discover kubernetes resource types: %w", err)
 	}
 
 	// Resource Type List
@@ -85,6 +98,7 @@ func New(logger hclog.Logger) *Kubernetes {
 				group:            group,
 				version:          version,
 				resourceTypeName: r.Name,
+				isNamespaced:     r.Namespaced,
 			}
 		}
 	}
@@ -92,54 +106,57 @@ func New(logger hclog.Logger) *Kubernetes {
 	// Read all resource type scheam
 	files, err := ioutil.ReadDir("plugin/kubernetes/table_schema")
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	resourceSchemaTypeMap := map[string]model.ResourceTransfomer{}
 	for _, f := range files {
 		data, err := os.ReadFile("plugin/kubernetes/table_schema/" + f.Name())
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
 		}
 
 		res := new(model.ResourceTransfomer)
 		if err := yaml.Unmarshal(data, res); err != nil {
-			panic(err)
+			return nil, fmt.Errorf("failed to unmarshal table schema data: %w", err)
 		}
 		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = *res
 	}
-
-	logger.Info("Fuck", resourceSchemaTypeMap)
 
 	return &Kubernetes{
 		logger:                logger,
 		normalClient:          clientset,
 		dynamicClient:         dynamicClient,
 		clientConfig:          cc,
+		config:                config,
 		resourceTypeMap:       resourceTypeMap,
 		resourceChanMap:       make(map[string]chan shared.WatchResourceResult),
 		resourceSchemaTypeMap: resourceSchemaTypeMap,
-	}
+	}, nil
 }
 
 func (d *Kubernetes) Name() string {
 	return "kubernetes"
 }
 
-func (d *Kubernetes) GetResources(resourceType string) []interface{} {
-	r := d.resourceTypeMap[resourceType]
-	items, err := listResourcesDynamically(d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
-	if err != nil {
-		panic(err)
+func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, error) {
+	r := d.resourceTypeMap[args.ResourceType]
+	if !r.isNamespaced || args.IsolatorID == "all" {
+		args.IsolatorID = ""
 	}
-	return items
+	items, err := listResourcesDynamically(d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, args.IsolatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	d.logger.Debug(fmt.Sprintf("Found %v %v resources in namespace %v", len(items), args.ResourceType, args.IsolatorID))
+	return items, nil
 }
 
 func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 	res, ok := d.resourceChanMap[resourceType]
 	if !ok {
-		d.logger.Debug("Channel for resource type does not exists", resourceType)
-		return nil
+		return fmt.Errorf("channel for resource type %s does not exists", resourceType)
 	}
 
 	d.logger.Debug("Closing resource watcher", resourceType)
@@ -147,12 +164,12 @@ func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 	return nil
 }
 
-func (d *Kubernetes) WatchResources(resourceType string) chan shared.WatchResourceResult {
+func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResourceResult, error) {
 	res, ok := d.resourceChanMap[resourceType]
 	if ok {
 		// Send it
 		d.logger.Debug("Channel already exists for resource", resourceType)
-		return res
+		return res, nil
 	}
 
 	d.logger.Debug("Creating a new channel for resource", resourceType)
@@ -165,43 +182,36 @@ func (d *Kubernetes) WatchResources(resourceType string) chan shared.WatchResour
 		r := d.resourceTypeMap[resourceType]
 		err := getResourcesDynamically(c, d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
 		if err != nil {
-			panic(err)
+			d.logger.Error("failed to watch over resource %s: %w", resourceType, err)
+			return
 		}
 	}()
 
-	return c
+	return c, nil
 }
 
-func (d *Kubernetes) GetResourceTypeSchema(resourceType string) model.ResourceTransfomer {
+func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (model.ResourceTransfomer, error) {
 	t, ok := d.resourceSchemaTypeMap[resourceType]
 	if !ok {
-		return d.resourceSchemaTypeMap["defaults"]
+		d.logger.Info(fmt.Sprintf("schema of resource type %s not found, using the default schema", resourceType))
+		return d.resourceSchemaTypeMap["defaults"], nil
 	}
-	// data, err := os.ReadFile("plugin/kubernetes/table_schema/pods.yaml")
-	// if err != nil {
-	// 	panic(err)
-	// }
 
-	// res := new(model.ResourceTransfomer)
-	// if err := yaml.Unmarshal(data, res); err != nil {
-	// 	panic(err)
-	// }
-
-	return t
+	return t, nil
 }
 
-func (d *Kubernetes) GetResourceTypeList() []string {
+func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
 	resp := []string{}
 	for r := range d.resourceTypeMap {
 		resp = append(resp, r)
 	}
-	return resp
+	return resp, nil
 }
 
-func (d *Kubernetes) GetGeneralInfo() map[string]string {
+func (d *Kubernetes) GetGeneralInfo() (map[string]string, error) {
 	v, err := d.normalClient.ServerVersion()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to load server version: %w", err)
 	}
 
 	cc := d.clientConfig.CurrentContext
@@ -222,13 +232,61 @@ func (d *Kubernetes) GetGeneralInfo() map[string]string {
 		"Cluster":        server,
 		"User":           user,
 		"Server Version": v.String(),
+	}, nil
+}
+
+// Use plural names
+func (d *Kubernetes) GetResourceIsolatorType() (string, error) {
+	return "namespaces", nil
+}
+
+func (d *Kubernetes) GetDefaultResourceIsolator() (string, error) {
+	return "default", nil
+}
+
+func (d *Kubernetes) GetSupportedActions(resourceType string) (shared.GenericActions, error) {
+	return shared.GenericActions{
+		IsDelete: true,
+		IsUpdate: false,
+		IsCreate: false,
+	}, nil
+}
+
+func (d *Kubernetes) ActionDeleteResource(args shared.ActionDeleteResourceArgs) error {
+	r := d.resourceTypeMap[args.ResourceType]
+	if !r.isNamespaced || args.IsolatorName == "all" {
+		args.IsolatorName = ""
 	}
+
+	return deleteResourcesDynamically(d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, args.IsolatorName, args.ResourceName)
 }
 
-func (d *Kubernetes) GetResourceIsolatorType() string {
-	return "namespace"
+func (d *Kubernetes) GetSpecficActionList(resourceType string) ([]shared.SpecificAction, error) {
+	return []shared.SpecificAction{
+		{
+			Name:         "describe",
+			KeyBinding:   "d",
+			ScrrenAction: "view",
+			OutputType:   "string",
+		},
+	}, nil
 }
 
-func (d *Kubernetes) GetDefaultResourceIsolator() string {
-	return "all"
+func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shared.SpecificActionResult, error) {
+
+	switch args.ActionName {
+
+	case "describe":
+		result, err := d.DescribeResource(args.ResourceType, args.ResourceName, args.IsolatorName)
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+
+		return shared.SpecificActionResult{
+			Result:     result,
+			OutputType: "string",
+		}, nil
+	}
+
+	return shared.SpecificActionResult{}, nil
 }

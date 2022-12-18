@@ -13,5 +13,5 @@ operations:
     output_format: ""
   - name: "age"
     json_paths: 
-    - path: ""
+    - path: "metadata.creationTimestamp|@age"
     output_format: ""

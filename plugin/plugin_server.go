@@ -36,7 +36,13 @@ func main() {
 
 	// a := &aws.AWS{}
 
-	pluginK8s := pnk8s.New(logger)
+	logger.Info("Starting plugin server")
+
+	pluginK8s, err := pnk8s.New(logger.Named("kubernetes"))
+	if err != nil {
+		logger.Error("failed to initialized kubernetes plugin", err)
+		os.Exit(1)
+	}
 
 	// pluginMap is the map of plugins we can dispense.
 	var pluginMap = map[string]plugin.Plugin{
@@ -47,5 +53,6 @@ func main() {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
+		// Logger:          logger,
 	})
 }
