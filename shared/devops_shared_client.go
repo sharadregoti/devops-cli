@@ -19,6 +19,16 @@ func (d *DevopsClientRPC) Name() string {
 	return resp
 }
 
+func (d *DevopsClientRPC) StatusOK() error {
+	var resp error
+	err := d.client.Call("Plugin.StatusOK", new(interface{}), &resp)
+	if err != nil {
+		return err
+	}
+
+	return resp
+}
+
 func (d *DevopsClientRPC) GetResources(args GetResourcesArgs) ([]interface{}, error) {
 	var resp []interface{}
 	err := d.client.Call("Plugin.GetResources", &args, &resp)

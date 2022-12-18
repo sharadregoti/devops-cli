@@ -2,9 +2,11 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 
@@ -24,6 +26,8 @@ type Kubernetes struct {
 	lock sync.RWMutex
 
 	logger hclog.Logger
+
+	isOK error
 
 	// Clients
 	normalClient  *kubernetes.Clientset
@@ -55,29 +59,36 @@ type resourceTypeInfo struct {
 }
 
 func New(logger hclog.Logger) (*Kubernetes, error) {
+
+	// Check if the kubectl command exists
+	_, err := exec.LookPath("kubectl")
+	if err != nil {
+		return &Kubernetes{logger: logger, isOK: fmt.Errorf("kubectl command not found: %w", err)}, err
+	}
+
 	config := ctrl.GetConfigOrDie()
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load kube config: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to load kube config: %w", err)
 	}
 
 	// Create a dynamic client
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load dynamic kube config: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to load dynamic kube config: %w", err)
 	}
 
 	cc, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{},
 		&clientcmd.ConfigOverrides{}).RawConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load kubernetes context: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to load kubernetes context: %w", err)
 	}
 
 	// List all supported resources
 	resources, err := clientset.Discovery().ServerPreferredResources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to discover kubernetes resource types: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to discover kubernetes resource types: %w", err)
 	}
 
 	// Resource Type List
@@ -106,19 +117,19 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	// Read all resource type scheam
 	files, err := ioutil.ReadDir("plugin/kubernetes/table_schema")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	resourceSchemaTypeMap := map[string]model.ResourceTransfomer{}
 	for _, f := range files {
 		data, err := os.ReadFile("plugin/kubernetes/table_schema/" + f.Name())
 		if err != nil {
-			return nil, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
+			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
 		}
 
 		res := new(model.ResourceTransfomer)
 		if err := yaml.Unmarshal(data, res); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal table schema data: %w", err)
+			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal table schema data: %w", err)
 		}
 		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = *res
 	}
@@ -137,6 +148,11 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 
 func (d *Kubernetes) Name() string {
 	return "kubernetes"
+}
+
+func (d *Kubernetes) StatusOK() error {
+	d.logger.Error(fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
+	return d.isOK
 }
 
 func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, error) {

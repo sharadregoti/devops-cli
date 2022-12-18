@@ -44,8 +44,8 @@ func main() {
 
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:   "devops",
-		Output: file,
-		Level:  hclog.Debug,
+		Output: os.Stdout,
+		Level:  hclog.Info,
 	})
 
 	logger.Info("Loading config file...")
@@ -73,7 +73,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("Loading plugin", c.Plugins[0].Name)
+	for _, p := range c.Plugins {
+		logger.Info(fmt.Sprintf("Loading plugin: %s", p.Name))
+		kp, err := pc.GetPlugin(c.Plugins[0].Name)
+		if err != nil {
+			os.Exit(1)
+		}
+		if err := kp.StatusOK(); err != nil {
+			// logger.Error("failed to load plugin", err)
+			os.Exit(1)
+		}
+	}
+
+	logger = hclog.New(&hclog.LoggerOptions{
+		Name:   "devops",
+		Output: file,
+		Level:  hclog.Debug,
+	})
+
 	kp, err := pc.GetPlugin(c.Plugins[0].Name)
 	if err != nil {
 		os.Exit(1)

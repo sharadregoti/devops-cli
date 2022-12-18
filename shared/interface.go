@@ -4,6 +4,7 @@ import "github.com/sharadregoti/devops/model"
 
 type Devops interface {
 	Name() string
+	StatusOK() error
 	MainBox
 	SearchBox
 	GeneralInfoBox

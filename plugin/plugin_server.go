@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"os"
 
 	"github.com/hashicorp/go-hclog"
@@ -40,8 +41,8 @@ func main() {
 
 	pluginK8s, err := pnk8s.New(logger.Named("kubernetes"))
 	if err != nil {
-		logger.Error("failed to initialized kubernetes plugin", err)
-		os.Exit(1)
+		logger.Error(fmt.Sprintf("failed to initialized kubernetes plugin: %v", err))
+		// os.Exit(1)
 	}
 
 	// pluginMap is the map of plugins we can dispense.

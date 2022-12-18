@@ -17,3 +17,5 @@ devops
 plugin/plugin
 
 *.csv
+
+dist/

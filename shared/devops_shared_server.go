@@ -9,6 +9,11 @@ func (d *DevopsServerRPC) Name(args interface{}, resp *string) error {
 	return nil
 }
 
+func (d *DevopsServerRPC) StatusOK(args interface{}, resp *error) error {
+	*resp = d.Impl.StatusOK()
+	return *resp
+}
+
 func (d *DevopsServerRPC) GetResources(args *GetResourcesArgs, resp *[]interface{}) error {
 	var err error
 	*resp, err = d.Impl.GetResources(*args)
