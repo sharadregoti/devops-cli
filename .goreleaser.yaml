@@ -8,15 +8,15 @@ builds:
   - id: devops-core
     goos:
       - linux
-      - windows
-      - darwin
+      # - windows
+      # - darwin
   - id: devops-kubernetes-plugin
     main: ./plugin
     binary: kubernetes
     goos:
       - linux
-      - windows
-      - darwin
+      # - windows
+      # - darwin
 archives:
   - replacements:
       darwin: Darwin
