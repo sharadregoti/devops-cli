@@ -30,7 +30,7 @@ var pluginMap = map[string]plugin.Plugin{
 	"kubernetes": &shared.DevopsPlugin{},
 }
 
-func New(logger hclog.Logger) (*PluginClient, error) {
+func New(logger hclog.Logger, devopsDir string) (*PluginClient, error) {
 	gob.Register(map[string]interface{}{})
 	gob.Register([]interface{}{})
 	gob.Register(make(chan shared.WatchResourceResult))
@@ -39,7 +39,7 @@ func New(logger hclog.Logger) (*PluginClient, error) {
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
-		Cmd:             exec.Command("./plugin/plugin"),
+		Cmd:             exec.Command(devopsDir + "/plugins/plugin"),
 		Logger:          logger,
 	})
 	// defer client.Kill()

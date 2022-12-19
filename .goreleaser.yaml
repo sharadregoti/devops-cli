@@ -5,7 +5,15 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
 builds:
-  - goos:
+  - id: devops-core
+    goos:
+      - linux
+      - windows
+      - darwin
+  - id: devops-kubernetes-plugin
+    main: ./plugin
+    binary: kubernetes
+    goos:
       - linux
       - windows
       - darwin

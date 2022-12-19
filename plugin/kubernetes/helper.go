@@ -21,7 +21,7 @@ func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.
 		Resource: resource,
 	}
 
-	fmt.Println(group, ":", version, ":", resource, ":", namespace, ":", resourceId)
+	// fmt.Println(group, ":", version, ":", resource, ":", namespace, ":", resourceId)
 	list, err := dynamic.Resource(resourceId).Namespace(namespace).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err

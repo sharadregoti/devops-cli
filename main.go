@@ -42,18 +42,18 @@ func main() {
 	}
 	defer file.Close()
 
-	logger := hclog.New(&hclog.LoggerOptions{
+	loggero := hclog.New(&hclog.LoggerOptions{
 		Name:   "devops",
 		Output: os.Stdout,
 		Level:  hclog.Info,
 	})
 
-	logger.Info("Loading config file...")
+	loggero.Info("Loading config file...")
 	c := new(model.Config)
 	configBytes, err := os.ReadFile(filepath.Join(devopsDir, "config.yaml"))
 	if os.IsNotExist(err) {
 		// Load default
-		logger.Info("config.yaml not found, loading default configuration")
+		loggero.Info("config.yaml not found, loading default configuration")
 		c = &model.Config{
 			Plugins: []*model.Plugin{
 				{
@@ -63,40 +63,40 @@ func main() {
 		}
 	} else {
 		if err := yaml.Unmarshal(configBytes, c); err != nil {
-			logger.Error("failed to yaml unmarshal config file", err)
+			loggero.Error("failed to yaml unmarshal config file", err)
 			os.Exit(1)
 		}
 	}
 
-	pc, err := New(logger)
+	loggerf := hclog.New(&hclog.LoggerOptions{
+		Name:   "devops",
+		Output: file,
+		Level:  hclog.Debug,
+	})
+
+	pc, err := New(loggerf, devopsDir)
 	if err != nil {
 		os.Exit(1)
 	}
 
 	for _, p := range c.Plugins {
-		logger.Info(fmt.Sprintf("Loading plugin: %s", p.Name))
+		loggero.Info(fmt.Sprintf("Loading plugin: %s", p.Name))
 		kp, err := pc.GetPlugin(c.Plugins[0].Name)
 		if err != nil {
 			os.Exit(1)
 		}
 		if err := kp.StatusOK(); err != nil {
-			// logger.Error("failed to load plugin", err)
+			loggero.Error("failed to load plugin", err)
 			os.Exit(1)
 		}
 	}
-
-	logger = hclog.New(&hclog.LoggerOptions{
-		Name:   "devops",
-		Output: file,
-		Level:  hclog.Debug,
-	})
 
 	kp, err := pc.GetPlugin(c.Plugins[0].Name)
 	if err != nil {
 		os.Exit(1)
 	}
 
-	pCtx, err := InitPluginContext(logger, kp, "configmaps")
+	pCtx, err := InitPluginContext(loggerf, kp, "configmaps")
 	if err != nil {
 		os.Exit(1)
 	}
@@ -105,7 +105,7 @@ func main() {
 	defer close(eventChan)
 
 	eventChan <- model.Event{ResourceType: "pods", Type: model.ResourceTypeChanged}
-	app := views.NewApplication(logger, eventChan)
+	app := views.NewApplication(loggerf, eventChan)
 
 	app.SearchView.SetResourceTypes(pCtx.supportedResourceTypes)
 	app.GeneralInfoView.Refresh(pCtx.generalInfo)
@@ -117,7 +117,7 @@ func main() {
 
 	go func() {
 		for event := range eventChan {
-			logger.Debug(fmt.Sprintf("Received new event of type <%s> on resource <%s>, row index <%v>", event.Type, event.ResourceType, event.RowIndex))
+			loggerf.Debug(fmt.Sprintf("Received new event of type <%s> on resource <%s>, row index <%v>", event.Type, event.ResourceType, event.RowIndex))
 
 			switch event.Type {
 			case model.ReadResource:
@@ -128,7 +128,7 @@ func main() {
 			case model.DeleteResource:
 				event.IsolatorName = pCtx.currentIsolator
 				if err := kp.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: event.ResourceName, ResourceType: event.ResourceType, IsolatorName: event.IsolatorName}); err != nil {
-					logger.Error("failed to delete resource", err)
+					loggerf.Error("failed to delete resource", err)
 					continue
 				}
 				app.SwitchToMain()
@@ -142,10 +142,10 @@ func main() {
 					IsolatorName: pCtx.currentIsolator,
 				}
 
-				logger.Info("Args", fnArgs)
+				loggerf.Info("Args", fnArgs)
 				res, err := kp.PerformSpecificAction(fnArgs)
 				if err != nil {
-					logger.Error("failed to perform specific action on resource", err)
+					loggerf.Error("failed to perform specific action on resource", err)
 					continue
 				}
 
@@ -174,7 +174,7 @@ func main() {
 			case model.IsolatorChanged:
 				event.ResourceType = pCtx.currentResourceType
 				pCtx.setCurrentIsolator(event.IsolatorName)
-				syncResource(logger, event, kp, pCtx, app)
+				syncResource(loggerf, event, kp, pCtx, app)
 
 			case model.AddIsolator:
 				if event.ResourceType != pCtx.defaultIsolatorType {
@@ -184,21 +184,21 @@ func main() {
 
 			case model.RefreshResource:
 				event.ResourceType = pCtx.currentResourceType
-				syncResource(logger, event, kp, pCtx, app)
+				syncResource(loggerf, event, kp, pCtx, app)
 
 			case model.ResourceTypeChanged:
 				// TODO: Handle wrong resource names
 				if event.ResourceType == "" {
-					logger.Debug("False invocation received, resource type is empty")
+					loggerf.Debug("False invocation received, resource type is empty")
 					continue
 				}
 
 				if event.ResourceType == pCtx.currentResourceType {
-					logger.Debug("Current & new resource type are the same, Ignoring this event")
+					loggerf.Debug("Current & new resource type are the same, Ignoring this event")
 					continue
 				}
 
-				syncResource(logger, event, kp, pCtx, app)
+				syncResource(loggerf, event, kp, pCtx, app)
 
 				// go func() {
 				// 	for {
@@ -219,7 +219,7 @@ func main() {
 	}()
 
 	if err := app.Start(); err != nil {
-		logger.Error("failed to start application", err)
+		loggerf.Error("failed to start application", err)
 		os.Exit(1)
 	}
 }

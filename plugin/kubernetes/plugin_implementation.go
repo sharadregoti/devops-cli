@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -114,15 +115,22 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 		}
 	}
 
+	resourceSchemaTypeMap := map[string]model.ResourceTransfomer{}
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
+	}
+	// Create the ".devops" subdirectory if it doesn't exist
+	devopsDir := filepath.Join(homeDir, ".devops")
+
 	// Read all resource type scheam
-	files, err := ioutil.ReadDir("plugin/kubernetes/table_schema")
+	files, err := ioutil.ReadDir(devopsDir + "/plugins/table_schema")
 	if err != nil {
 		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	resourceSchemaTypeMap := map[string]model.ResourceTransfomer{}
 	for _, f := range files {
-		data, err := os.ReadFile("plugin/kubernetes/table_schema/" + f.Name())
+		data, err := os.ReadFile(devopsDir + "/plugins/table_schema/" + f.Name())
 		if err != nil {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
 		}
