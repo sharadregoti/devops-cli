@@ -39,3 +39,6 @@ blobs:
   - provider: gs
     bucket: devops-cli-artifacts
     folder: "releases/devops/{{.Version}}"
+    ids:
+    - devops-core
+    - devops-kubernetes-plugin
