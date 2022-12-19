@@ -19,6 +19,15 @@ import (
 // Installing VS Code Server for x64 (1ad8d514439d5077d2b0b7ee64d2ce82a9308e5a)
 // Downloading:  80%
 
+var release bool = false
+
+func getPluginPath(devopsDir string) string {
+	if release {
+		return devopsDir + "/plugins/kubernetes/kubernetes"
+	}
+	return "./plugin/plugin"
+}
+
 func main() {
 	// Get the user's home directory
 	homeDir, err := os.UserHomeDir()
@@ -74,7 +83,7 @@ func main() {
 		Level:  hclog.Debug,
 	})
 
-	pc, err := New(loggerf, devopsDir)
+	pc, err := New(loggerf, getPluginPath(devopsDir))
 	if err != nil {
 		os.Exit(1)
 	}

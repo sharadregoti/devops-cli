@@ -30,16 +30,17 @@ var pluginMap = map[string]plugin.Plugin{
 	"kubernetes": &shared.DevopsPlugin{},
 }
 
-func New(logger hclog.Logger, devopsDir string) (*PluginClient, error) {
+func New(logger hclog.Logger, path string) (*PluginClient, error) {
 	gob.Register(map[string]interface{}{})
 	gob.Register([]interface{}{})
 	gob.Register(make(chan shared.WatchResourceResult))
+	logger.Debug("Path is", path)
 
 	// We're a host! Start by launching the plugin process.
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
-		Cmd:             exec.Command(devopsDir + "/plugins/plugin"),
+		Cmd:             exec.Command(path),
 		Logger:          logger,
 	})
 	// defer client.Kill()

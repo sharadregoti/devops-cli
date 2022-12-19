@@ -23,6 +23,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+var release bool = false
+
+func getSchemaPath(devopsDir string) string {
+	if release {
+		return devopsDir + "/plugins/kubernetes/table_schema"
+	}
+	return "./plugin/kubernetes/table_schema"
+}
+
 type Kubernetes struct {
 	lock sync.RWMutex
 
@@ -123,14 +132,15 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	// Create the ".devops" subdirectory if it doesn't exist
 	devopsDir := filepath.Join(homeDir, ".devops")
 
+	schemaPath := getSchemaPath(devopsDir)
 	// Read all resource type scheam
-	files, err := ioutil.ReadDir(devopsDir + "/plugins/table_schema")
+	files, err := ioutil.ReadDir(schemaPath)
 	if err != nil {
 		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	for _, f := range files {
-		data, err := os.ReadFile(devopsDir + "/plugins/table_schema/" + f.Name())
+		data, err := os.ReadFile(schemaPath + "/" + f.Name())
 		if err != nil {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
 		}
