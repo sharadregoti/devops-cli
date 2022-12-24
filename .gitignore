@@ -15,6 +15,7 @@
 # vendor/
 devops
 plugin/plugin
+plugin/kubernetes/kubernetes/kubernetes
 
 *.csv
 
