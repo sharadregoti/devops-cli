@@ -29,8 +29,9 @@ tar -xzf "$HOME/.devops/plugins/kubernetes/devops.tar.gz" -C "$HOME/.devops/plug
 
 
 # Add the binary to the system path
-echo 'export PATH=$PATH:$HOME/.devops' >> ~/.bashrc
-source ~/.bashrc
+# echo 'export PATH=$PATH:$HOME/.devops' >> ~/.bashrc
+# source ~/.bashrc
+sudo cp "$HOME/.devops/devops" "/usr/local/bin"
 
 rm "$HOME/.devops/devops.tar.gz"
 rm "$HOME/.devops/plugins/kubernetes/devops.tar.gz"

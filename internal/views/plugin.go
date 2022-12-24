@@ -1,9 +1,6 @@
 package views
 
 import (
-	"bytes"
-	"fmt"
-
 	"github.com/rivo/tview"
 )
 
@@ -27,13 +24,5 @@ func (g *PluginView) GetView() *tview.TextView {
 
 func (g *PluginView) Refresh(data map[string]string) {
 	g.view.Clear()
-	g.view.SetText(createKeyValuePairsPlugin(data))
-}
-
-func createKeyValuePairsPlugin(m map[string]string) string {
-	b := new(bytes.Buffer)
-	for key, value := range m {
-		fmt.Fprintf(b, "%s: \"%s\"\n", key, value)
-	}
-	return b.String()
+	g.view.SetText(createKeyValuePairsWithBrackets(data))
 }

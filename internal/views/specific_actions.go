@@ -29,6 +29,6 @@ func (g *SpecificActions) RefreshActions(data []shared.SpecificAction) {
 	for _, sa := range data {
 		temp[sa.KeyBinding] = sa.Name
 	}
-	g.view.SetText(createKeyValuePairs(temp))
+	g.view.SetText(createKeyValuePairsWithBrackets(temp))
 	g.actions = data
 }

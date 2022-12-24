@@ -1,7 +1,7 @@
 //go:build release
 // +build release
 
-package main
+package core
 
 func init() {
 	release = true

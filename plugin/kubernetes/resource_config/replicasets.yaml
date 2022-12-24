@@ -1,0 +1,30 @@
+operations:
+  - name: "namespace"
+    json_paths: 
+    - path: "metadata.namespace"
+    output_format: ""
+  - name: "name"
+    json_paths: 
+    - path: "metadata.name"
+    output_format: ""
+  - name: "desired"
+    json_paths:
+    - path: "status.replicas"
+    output_format: "%v"
+  - name: "current"
+    json_paths:
+    - path: "status.availableReplicas"
+    output_format: ""
+  - name: "ready"
+    json_paths: 
+    - path: "status.readyReplicas"
+    output_format: ""
+  - name: "age"
+    json_paths: 
+    - path: "metadata.creationTimestamp|@age"
+    output_format: ""
+specific_actions:
+  - name: "describe"
+    key_binding: "d"
+    scrren_action: "view"
+    output_type: "string"

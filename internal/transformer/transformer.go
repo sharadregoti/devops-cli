@@ -3,15 +3,19 @@ package transformer
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
-	"github.com/golang-module/carbon/v2"
 	"github.com/sharadregoti/devops/model"
 	"github.com/tidwall/gjson"
 )
 
 func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface{}) ([][]string, error) {
+	gjson.AddModifier("age", func(json, arg string) string {
+		return getAge(json[1 : len(json)-1])
+	})
+
 	tableResult := make([][]string, 0)
 
 	headerRows := make([]string, 0)
@@ -48,11 +52,10 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) ([]string,
 		var pathExecResults []interface{} = make([]interface{}, 0)
 		for _, j := range o.JSONPaths {
 			if j.Path != "" {
-				gjson.AddModifier("age", func(json, arg string) string {
-					// Remove quotes
-					return getAge(json[1 : len(json)-1])
-				})
-				value := gjson.Get(string(strData), j.Path)
+				value := gjson.Get(string(strData), j.Path).String()
+				if value == "" {
+					value = "NA"
+				}
 				pathExecResults = append(pathExecResults, value)
 			}
 		}
@@ -68,27 +71,40 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) ([]string,
 }
 
 func getAge(ts string) string {
-	result := 100
-	result = carbon.ParseByLayout(ts, time.RFC3339).Age()
+	// result = carbon.ParseByLayout(ts, time.RFC3339).Age()
 	// _, err := time.Parse(ts, time.RFC3339)
-	// if err != nil {
-	// 	fmt.Println(ts, err)
-	// 	return "nil"
-	// }
+	// Parse the time string using the time.Parse function
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		fmt.Println(err)
+		return "invalid"
+	}
 
-	// // calculate the difference between the current time and the timestamp
-	// difference := time.Since(t)
+	// Calculate the number of seconds, minutes, hours, and days since the given time
+	seconds := time.Since(t).Seconds()
+	minutes := time.Since(t).Minutes()
+	hours := time.Since(t).Hours()
+	days := time.Since(t).Hours() / 24
 
-	// // convert the difference to a human-readable string
-	// if seconds := difference.Seconds(); seconds < 60 {
-	// 	result = fmt.Sprintf("%ds", int(seconds))
-	// } else if minutes := difference.Minutes(); minutes < 60 {
-	// 	result = fmt.Sprintf("%dm", int(minutes))
-	// } else if hours := difference.Hours(); hours < 24 {
-	// 	result = fmt.Sprintf("%dh", int(hours))
-	// } else {
-	// 	result = fmt.Sprintf("%dd", int(difference.Hours()/24))
-	// }
+	// Round the values to print only whole numbers
+	seconds = math.Round(seconds)
+	minutes = math.Round(minutes)
+	hours = math.Round(hours)
+	days = math.Round(days)
 
-	return fmt.Sprintf("%v", result)
+	// Print the values if they are greater than 0
+	result := ""
+	if days > 0 {
+		result = fmt.Sprintf("%.0fd", days)
+	} else if hours > 0 {
+		result = fmt.Sprintf("%.0fh", hours)
+	} else if minutes > 0 {
+		result = fmt.Sprintf("%.0fm", minutes)
+	} else if seconds > 0 {
+		result = fmt.Sprintf("%.0fs", seconds)
+	} else {
+		result = "Yo"
+	}
+
+	return fmt.Sprintf(`"%s"`, result)
 }

@@ -20,7 +20,7 @@ func NewAction() *Actions {
 }
 
 func (g *Actions) RefreshActions(data shared.GenericActions) {
-	tempMap := map[string]string{"ctrl-y": "read"}
+	tempMap := map[string]string{"ctrl-y": "read", "ctrl-r": "refresh", "ctrl-a": "search resources"}
 	if data.IsCreate {
 		tempMap["ctrl-c"] = "create"
 	}
@@ -30,5 +30,5 @@ func (g *Actions) RefreshActions(data shared.GenericActions) {
 	if data.IsDelete {
 		tempMap["ctrl-d"] = "delete"
 	}
-	g.view.SetText(createKeyValuePairs(tempMap))
+	g.view.SetText(createKeyValuePairsWithBrackets(tempMap))
 }

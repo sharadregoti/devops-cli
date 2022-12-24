@@ -49,6 +49,10 @@ func (g *IsolatorView) GetView() *tview.TextView {
 	return g.view
 }
 
+func (g *IsolatorView) SetTitle(data string) {
+	g.view.SetTitle(data)
+}
+
 func (g *IsolatorView) SetDefault(data string) {
 	g.view.Clear()
 	temp := []string{data}
@@ -57,7 +61,6 @@ func (g *IsolatorView) SetDefault(data string) {
 }
 
 func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
-	g.logger.Debug("Called")
 	if isolatorName == "" {
 		return
 	}
@@ -70,18 +73,15 @@ func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
 		}
 	}
 
-	g.logger.Debug("Called1")
 	// Insert the element at specific index, shift remaining by 1
 	g.currentKeyMap = append(g.currentKeyMap[:1], append([]string{isolatorName}, g.currentKeyMap[1:]...)...)
 
 	limit := 3
 	if len(g.currentKeyMap) > limit {
 		// Cut off extra keys
-		g.logger.Debug("Called4")
 		g.currentKeyMap = g.currentKeyMap[:limit]
 	}
 
-	g.logger.Debug("Called5")
 	g.view.SetText(createKeyValuePairsIsolator(g.currentKeyMap))
 }
 

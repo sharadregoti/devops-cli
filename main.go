@@ -1,14 +1,13 @@
-package main
+package core
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/ghodss/yaml"
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
@@ -21,83 +20,34 @@ import (
 
 var release bool = false
 
-func getPluginPath(devopsDir string) string {
+func getPluginPath(name, devopsDir string) string {
 	if release {
-		return devopsDir + "/plugins/kubernetes/kubernetes"
+		return fmt.Sprintf("%s/plugins/%s/%s", devopsDir, name, name)
 	}
-	return "./plugin/plugin"
+	return fmt.Sprintf("../../plugin/%s/%s/%s", name, name, name)
 }
 
-func main() {
-	// Get the user's home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal("Cannot detect home directory", err)
-	}
-
-	// Create the ".devops" subdirectory if it doesn't exist
-	devopsDir := filepath.Join(homeDir, ".devops")
-	if _, err := os.Stat(devopsDir); os.IsNotExist(err) {
-		err = os.Mkdir(devopsDir, 0755)
-		if err != nil {
-			log.Fatal("Cannot create .devops directory", err)
-		}
-	}
-
-	filePath := filepath.Join(devopsDir, "devops.log")
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Fatal("Cannot create devops.log file", err)
-	}
+func Init() {
+	devopsDir := initCoreDirectory()
+	file := getCoreLogFile(devopsDir)
 	defer file.Close()
 
-	loggero := hclog.New(&hclog.LoggerOptions{
-		Name:   "devops",
-		Output: os.Stdout,
-		Level:  hclog.Info,
-	})
+	c := loadConfig(devopsDir)
 
-	loggero.Info("Loading config file...")
-	c := new(model.Config)
-	configBytes, err := os.ReadFile(filepath.Join(devopsDir, "config.yaml"))
-	if os.IsNotExist(err) {
-		// Load default
-		loggero.Info("config.yaml not found, loading default configuration")
-		c = &model.Config{
-			Plugins: []*model.Plugin{
-				{
-					Name: "kubernetes",
-				},
-			},
-		}
-	} else {
-		if err := yaml.Unmarshal(configBytes, c); err != nil {
-			loggero.Error("failed to yaml unmarshal config file", err)
-			os.Exit(1)
-		}
+	checIfPluginExists(devopsDir, c)
+
+	loggero, loggerf := createLoggers(file)
+	if len(c.Plugins) == 0 {
+		log.Fatal("No plugins were specified in the configuration, Exitting...")
 	}
 
-	loggerf := hclog.New(&hclog.LoggerOptions{
-		Name:   "devops",
-		Output: file,
-		Level:  hclog.Debug,
-	})
+	// On startup load the first plugin
+	initialPlugin := c.Plugins[0]
+	fmt.Printf("Loading plugin: %s\n", initialPlugin.Name)
 
-	pc, err := New(loggerf, getPluginPath(devopsDir))
+	pc, err := loadPlugin(loggerf, initialPlugin.Name, devopsDir)
 	if err != nil {
 		os.Exit(1)
-	}
-
-	for _, p := range c.Plugins {
-		loggero.Info(fmt.Sprintf("Loading plugin: %s", p.Name))
-		kp, err := pc.GetPlugin(c.Plugins[0].Name)
-		if err != nil {
-			os.Exit(1)
-		}
-		if err := kp.StatusOK(); err != nil {
-			loggero.Error("failed to load plugin", err)
-			os.Exit(1)
-		}
 	}
 
 	kp, err := pc.GetPlugin(c.Plugins[0].Name)
@@ -105,45 +55,60 @@ func main() {
 		os.Exit(1)
 	}
 
-	pCtx, err := InitPluginContext(loggerf, kp, "configmaps")
-	if err != nil {
+	if err := kp.StatusOK(); err != nil {
+		loggero.Error("failed to load plugin", err)
 		os.Exit(1)
 	}
 
 	eventChan := make(chan model.Event, 1)
 	defer close(eventChan)
 
-	eventChan <- model.Event{ResourceType: "pods", Type: model.ResourceTypeChanged}
 	app := views.NewApplication(loggerf, eventChan)
 
-	app.SearchView.SetResourceTypes(pCtx.supportedResourceTypes)
-	app.GeneralInfoView.Refresh(pCtx.generalInfo)
-	app.IsolatorView.SetDefault(pCtx.defaultIsolator)
+	// Initiate global plugin contexts
+	pCtx, err := initPluginContext(loggerf, kp, app, initialPlugin.Name)
+	if err != nil {
+		os.Exit(1)
+	}
 
-	app.PluginView.Refresh(map[string]string{"ctrl-a": kp.Name()})
+	eventChan <- model.Event{
+		ResourceType:       pCtx.defaultIsolatorType,
+		Type:               model.ResourceTypeChanged,
+		RowIndex:           0,
+		ResourceName:       "",
+		IsolatorName:       "",
+		SpecificActionName: "",
+	}
+
 	closerChan := make(chan struct{}, 1)
+	streamCloserChan := make(chan struct{}, 1)
+	defer close(streamCloserChan)
 	defer close(closerChan)
+	isStreamingOn := false
+	// invokingFirstTime := true
 
 	go func() {
 		for event := range eventChan {
 			loggerf.Debug(fmt.Sprintf("Received new event of type <%s> on resource <%s>, row index <%v>", event.Type, event.ResourceType, event.RowIndex))
 
 			switch event.Type {
-			case model.ReadResource:
-				data := pCtx.currentResources[event.RowIndex-1]
-				dd, _ := yaml.Marshal(data)
-				app.SetText(string(dd))
-				app.GetApp().Draw()
-			case model.DeleteResource:
-				event.IsolatorName = pCtx.currentIsolator
-				if err := kp.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: event.ResourceName, ResourceType: event.ResourceType, IsolatorName: event.IsolatorName}); err != nil {
-					loggerf.Error("failed to delete resource", err)
-					continue
+
+			case model.Close:
+				if isStreamingOn {
+					fnArgs := shared.SpecificActionArgs{
+						ActionName: "close",
+					}
+					_, err := kp.PerformSpecificAction(fnArgs)
+					if err != nil {
+						loggerf.Error("failed to perform close action on resource", err)
+						continue
+					}
+					streamCloserChan <- struct{}{}
+					isStreamingOn = false
 				}
-				app.SwitchToMain()
 
+			// Specfic action on resource
 			case model.SpecificActionOccured:
-
 				fnArgs := shared.SpecificActionArgs{
 					ActionName:   event.SpecificActionName,
 					ResourceName: event.ResourceName,
@@ -151,15 +116,12 @@ func main() {
 					IsolatorName: pCtx.currentIsolator,
 				}
 
-				loggerf.Info("Args", fnArgs)
+				loggerf.Debug("Specific action args", fnArgs)
 				res, err := kp.PerformSpecificAction(fnArgs)
 				if err != nil {
 					loggerf.Error("failed to perform specific action on resource", err)
 					continue
 				}
-
-				// logger.Info(fmt.Sprintf("Result %s", res.OutputType))
-				// continue
 
 				action := shared.SpecificAction{}
 				for _, sa := range pCtx.currentSpecficActionList {
@@ -172,14 +134,55 @@ func main() {
 				}
 
 				if action.ScrrenAction == "view" {
-					stringData := res.Result.(string)
-					app.SetText(stringData)
+					switch action.OutputType {
+					case "string":
+						stringData := res.Result.(string)
+						app.SetTextAndSwitchView(stringData)
+						app.GetApp().Draw()
+						continue
+
+					case "stream":
+						newReader := bufio.NewReader(reader)
+						if newReader == nil {
+							loggerf.Debug("Failed to create a reader for stream")
+							continue
+						}
+
+						app.SetTextAndSwitchView("")
+						app.GetApp().Draw()
+						go func() {
+							isStreamingOn = true
+							for {
+								select {
+								case <-streamCloserChan:
+									loggerf.Debug("Streamer go routine closed")
+									return
+								default:
+									data, _, err := newReader.ReadLine()
+									// data, err := newReader.ReadString(byte('\n'))
+									if err == io.EOF {
+										loggerf.Error("EOF received while streaming", err)
+										break
+									} else if err != nil {
+										loggerf.Error("failed to stream data", err)
+										break
+									}
+									w := app.Ta.BatchWriter()
+									fmt.Fprintln(w, string(data))
+									w.Close()
+									app.GetApp().Draw()
+
+								}
+							}
+						}()
+					}
+
 				}
-				app.GetApp().Draw()
 
 			case model.ShowModal:
-				app.ViewModel()
+				app.ViewModel(event.ResourceType, event.ResourceName)
 
+			// Isolator actions
 			case model.IsolatorChanged:
 				event.ResourceType = pCtx.currentResourceType
 				pCtx.setCurrentIsolator(event.IsolatorName)
@@ -190,9 +193,26 @@ func main() {
 					continue
 				}
 				app.IsolatorView.AddAndRefreshView(event.IsolatorName)
+				app.GetApp().Draw()
+
+			// Resource Actions
+			case model.ReadResource:
+				// -1 because, table data index starts with 1 and on
+				// The data stored in array starts with 0 index, So 1 table row maps with 0 of array row
+				data := pCtx.currentResources[event.RowIndex-1]
+				// TODO: Take format type from plugin
+				dd, _ := yaml.Marshal(data)
+				app.SetTextAndSwitchView(string(dd))
+				app.GetApp().Draw()
+
+			case model.DeleteResource:
+				if err := kp.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: event.ResourceName, ResourceType: event.ResourceType, IsolatorName: event.IsolatorName}); err != nil {
+					loggerf.Error("failed to delete resource", err)
+					continue
+				}
+				app.SwitchToMain()
 
 			case model.RefreshResource:
-				event.ResourceType = pCtx.currentResourceType
 				syncResource(loggerf, event, kp, pCtx, app)
 
 			case model.ResourceTypeChanged:
@@ -207,12 +227,20 @@ func main() {
 					continue
 				}
 
+				// if invokingFirstTime {
+				// 	invokingFirstTime = false
+				// } else {
+				// 	closerChan <- struct{}{}
+				// 	invokingFirstTime = true
+				// }
+
 				syncResource(loggerf, event, kp, pCtx, app)
 
 				// go func() {
 				// 	for {
 				// 		select {
 				// 		case <-closerChan:
+				// 			loggerf.Debug("Closing previous refresh routine")
 				// 			return
 				// 		case <-time.After(5 * time.Second):
 				// 			eventChan <- model.Event{
@@ -231,58 +259,4 @@ func main() {
 		loggerf.Error("failed to start application", err)
 		os.Exit(1)
 	}
-}
-
-func syncResource(logger hclog.Logger, event model.Event, kp shared.Devops, pCtx *CurrentPluginContext, app *views.Application) {
-	schema, err := kp.GetResourceTypeSchema(event.ResourceType)
-	if err != nil {
-		logger.Error("failed to fetch resource type schema", err)
-		return
-	}
-	pCtx.currentSchema = schema
-
-	resources, err := kp.GetResources(shared.GetResourcesArgs{ResourceType: event.ResourceType, IsolatorID: pCtx.currentIsolator})
-	if err != nil {
-		logger.Error("failed to fetch resources", err)
-		return
-	}
-	pCtx.currentResources = resources
-
-	table, err := transformer.GetResourceInTableFormat(&schema, resources)
-	if err != nil {
-		logger.Error("unable to convert resource data of type into table format", event.ResourceType, err)
-		return
-	}
-
-	actions, err := kp.GetSupportedActions(event.ResourceType)
-	if err != nil {
-		logger.Error("unable to get supported actions of resource", event.ResourceType, err)
-		return
-	}
-
-	app.ActionView.RefreshActions(actions)
-
-	specificActions, err := kp.GetSpecficActionList(event.ResourceType)
-	if err != nil {
-		logger.Error("unable to get specific actions of resource", event.ResourceType, err)
-		return
-	}
-
-	if event.ResourceType == pCtx.defaultIsolatorType {
-		specificActions = append(specificActions, shared.SpecificAction{Name: "Use", KeyBinding: "u"})
-	}
-	app.SpecificActionView.RefreshActions(specificActions)
-	pCtx.currentSpecficActionList = specificActions
-
-	pCtx.currentResourceType = event.ResourceType
-
-	logger.Debug("Removing search view")
-	app.RemoveSearchView()
-	logger.Debug("Refreshing table")
-	app.MainView.Refresh(table)
-	app.MainView.SetTitle(event.ResourceType)
-	logger.Debug("Setting focus to main view")
-	app.GetApp().SetFocus(app.MainView.GetView())
-	app.GetApp().Draw()
-	logger.Debug("Activation done")
 }

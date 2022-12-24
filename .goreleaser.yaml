@@ -37,8 +37,8 @@ archives:
     id: devops-kubernetes-plugin
     name_template: "devops-kubernetes-plugin_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - src: plugin/kubernetes/table_schema
-        dst: table_schema
+      - src: plugin/kubernetes/resource_config
+        dst: resource_config
         strip_parent: true
     replacements:
       darwin: Darwin
