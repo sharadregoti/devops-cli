@@ -7,24 +7,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antonmedv/expr"
+	"github.com/gdamore/tcell/v2"
 	"github.com/sharadregoti/devops/model"
 	"github.com/tidwall/gjson"
 )
 
-func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface{}) ([][]string, error) {
+func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, error) {
 	gjson.AddModifier("age", func(json, arg string) string {
 		return getAge(json[1 : len(json)-1])
 	})
 
-	tableResult := make([][]string, 0)
+	tableResult := make([]*model.TableRow, 0)
 
-	headerRows := make([]string, 0)
+	headerRow := new(model.TableRow)
 	for _, o := range t.Operations {
-		headerRows = append(headerRows, strings.ToUpper(o.Name))
+		headerRow.Data = append(headerRow.Data, strings.ToUpper(o.Name))
 	}
+	headerRow.Color = tcell.ColorYellow
 
-	tableResult = append(tableResult, make([]string, len(headerRows)))
-	copy(tableResult[len(tableResult)-1], headerRows)
+	tableResult = append(tableResult, headerRow)
+	// copy(tableResult[len(tableResult)-1], headerRow)
 
 	for _, v := range resources {
 		res, err := TransformResource(t, v)
@@ -32,14 +35,15 @@ func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface
 			return nil, err
 		}
 
-		tableResult = append(tableResult, make([]string, len(res)))
-		copy(tableResult[len(tableResult)-1], res)
+		tableResult = append(tableResult, res)
+		// copy(tableResult[len(tableResult)-1], res)
 	}
 
 	return tableResult, nil
 }
 
-func TransformResource(t *model.ResourceTransfomer, data interface{}) ([]string, error) {
+func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.TableRow, error) {
+	resultRow := new(model.TableRow)
 	dataRow := make([]string, 0)
 
 	strData, err := json.Marshal(data)
@@ -52,6 +56,7 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) ([]string,
 		var pathExecResults []interface{} = make([]interface{}, 0)
 		for _, j := range o.JSONPaths {
 			if j.Path != "" {
+				// Evaluate gjson expression
 				value := gjson.Get(string(strData), j.Path).String()
 				if value == "" {
 					value = "NA"
@@ -66,8 +71,44 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) ([]string,
 
 		dataRow = append(dataRow, fmt.Sprintf(o.OutputFormat, pathExecResults...))
 	}
+	resultRow.Data = dataRow
+	resultRow.Color = tcell.ColorWhite
 
-	return dataRow, nil
+	for _, s := range t.Styles {
+		for _, c := range s.Conditions {
+			// Evaluate the condition
+			// fmt.Println("here")
+			output, err := expr.Eval(c, data)
+			if err != nil {
+				return nil, fmt.Errorf("failed to evaluate style condition: %v", err)
+			}
+
+			result, ok := output.(bool)
+			if !ok {
+				return nil, fmt.Errorf("condition evaluation resulted into an unknown type %v, expected boolean", result)
+			}
+
+			if !result {
+				break
+			}
+			switch s.RowBackgroundColor {
+			case "red":
+				resultRow.Color = tcell.ColorRed
+			case "yellow":
+				resultRow.Color = tcell.ColorYellow
+			case "blue":
+				resultRow.Color = tcell.ColorBlue
+			case "orange":
+				resultRow.Color = tcell.ColorOrange
+			case "green":
+				resultRow.Color = tcell.ColorGreen
+			case "aqua":
+				resultRow.Color = tcell.ColorAqua
+			}
+		}
+	}
+
+	return resultRow, nil
 }
 
 func getAge(ts string) string {

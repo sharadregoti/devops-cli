@@ -1,11 +1,14 @@
 package views
 
 import (
+	"fmt"
+
 	"github.com/rivo/tview"
 )
 
 type PluginView struct {
 	view *tview.TextView
+	data []string
 }
 
 func NewPluginView() *PluginView {
@@ -22,7 +25,12 @@ func (g *PluginView) GetView() *tview.TextView {
 	return g.view
 }
 
-func (g *PluginView) Refresh(data map[string]string) {
+func (g *PluginView) Refresh(plugins []string) {
+	g.data = plugins
+	pluginMap := map[string]string{}
+	for i, p := range plugins {
+		pluginMap[fmt.Sprintf("alt-%d", i)] = p
+	}
 	g.view.Clear()
-	g.view.SetText(createKeyValuePairsWithBrackets(data))
+	g.view.SetText(createKeyValuePairsWithBrackets(pluginMap))
 }

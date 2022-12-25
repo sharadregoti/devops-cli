@@ -31,7 +31,10 @@ tar -xzf "$HOME/.devops/plugins/kubernetes/devops.tar.gz" -C "$HOME/.devops/plug
 # Add the binary to the system path
 # echo 'export PATH=$PATH:$HOME/.devops' >> ~/.bashrc
 # source ~/.bashrc
+echo "Enter your password to move binary to /usr/local/bin"
 sudo cp "$HOME/.devops/devops" "/usr/local/bin"
 
 rm "$HOME/.devops/devops.tar.gz"
 rm "$HOME/.devops/plugins/kubernetes/devops.tar.gz"
+
+echo "Devops CLI stores all config information in $HOME/.devops"

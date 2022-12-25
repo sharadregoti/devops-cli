@@ -7,10 +7,10 @@ operations:
     json_paths: 
     - path: "metadata.name"
     output_format: ""
-  # - name: "status"
-  #   json_paths: 
-  #   - path: "status.phase"
-    # output_format: ""
+  - name: "status"
+    json_paths: 
+    - path: "status.phase"
+    output_format: ""
   - name: "age"
     json_paths: 
     - path: "metadata.creationTimestamp|@age"

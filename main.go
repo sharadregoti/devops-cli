@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -30,7 +31,7 @@ func getPluginPath(name, devopsDir string) string {
 func Init() {
 	devopsDir := initCoreDirectory()
 	file := getCoreLogFile(devopsDir)
-	defer file.Close()
+	// defer file.Close()
 
 	c := loadConfig(devopsDir)
 
@@ -50,7 +51,7 @@ func Init() {
 		os.Exit(1)
 	}
 
-	kp, err := pc.GetPlugin(c.Plugins[0].Name)
+	kp, err := pc.GetPlugin(initialPlugin.Name)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -71,6 +72,12 @@ func Init() {
 		os.Exit(1)
 	}
 
+	pluginNames := []string{}
+	for _, p := range c.Plugins {
+		pluginNames = append(pluginNames, p.Name)
+	}
+	app.PluginView.Refresh(pluginNames)
+
 	eventChan <- model.Event{
 		ResourceType:       pCtx.defaultIsolatorType,
 		Type:               model.ResourceTypeChanged,
@@ -89,9 +96,34 @@ func Init() {
 
 	go func() {
 		for event := range eventChan {
-			loggerf.Debug(fmt.Sprintf("Received new event of type <%s> on resource <%s>, row index <%v>", event.Type, event.ResourceType, event.RowIndex))
+			data, _ := json.MarshalIndent(event, " ", " ")
+			loggerf.Debug(fmt.Sprintf("Received event %v", string(data)))
 
 			switch event.Type {
+
+			case model.PluginChanged:
+				pc.Close()
+				pc, err = loadPlugin(loggerf, event.PluginName, devopsDir)
+				if err != nil {
+					continue
+				}
+				kp, err = pc.GetPlugin(event.PluginName)
+				if err != nil {
+					continue
+				}
+				pCtx, err = initPluginContext(loggerf, kp, app, event.PluginName)
+				if err != nil {
+					continue
+				}
+				// Inovked event
+				eventChan <- model.Event{
+					ResourceType:       pCtx.defaultIsolatorType,
+					Type:               model.ResourceTypeChanged,
+					RowIndex:           0,
+					ResourceName:       "",
+					IsolatorName:       "",
+					SpecificActionName: "",
+				}
 
 			case model.Close:
 				if isStreamingOn {
@@ -142,7 +174,7 @@ func Init() {
 						continue
 
 					case "stream":
-						newReader := bufio.NewReader(reader)
+						newReader := bufio.NewReader(pc.GetStdoutReader())
 						if newReader == nil {
 							loggerf.Debug("Failed to create a reader for stream")
 							continue
@@ -155,8 +187,8 @@ func Init() {
 							for {
 								select {
 								case <-streamCloserChan:
-									loggerf.Debug("Streamer go routine closed")
-									return
+									// loggerf.Debug("Streamer go routine closed")
+									// return
 								default:
 									data, _, err := newReader.ReadLine()
 									// data, err := newReader.ReadString(byte('\n'))

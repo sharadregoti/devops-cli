@@ -1,0 +1,14 @@
+operations:
+  - name: "region"
+    json_paths: 
+    - path: "region"
+    output_format: ""
+  - name: "name"
+    json_paths: 
+    - path: "tags"
+    output_format: ""
+specific_actions:
+  # - name: "describe"
+  #   key_binding: "d"
+  #   scrren_action: "view"
+  #   output_type: "string"

@@ -36,23 +36,26 @@ func initCoreDirectory() string {
 func getCoreLogFile(devopsDir string) *os.File {
 	// Create the ".devops" subdirectory if it doesn't exist
 	filePath := filepath.Join(devopsDir, "devops.log")
+	fmt.Println("Logfile can be found at:", filePath)
 	var file *os.File
 	var err error
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		file, err = os.Create(filePath)
-		if err != nil {
-			log.Fatal("Cannot create devops.log file", err)
-		}
-		return file
-	} else if !os.IsExist(err) && err != nil {
-		log.Fatal("Cannot get stats of devops.log fiel", err)
-	}
-
-	file, err = os.Open(filePath)
+	// if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	file, err = os.Create(filePath)
 	if err != nil {
-		log.Fatal("Cannot open devops.log file", err)
+		log.Fatal("Cannot create devops.log file", err)
 	}
+	// TODO: Fix this
 	return file
+	// } else if !os.IsExist(err) && err != nil {
+	// 	log.Fatal("Cannot get stats of devops.log fiel", err)
+	// }
+
+	// file, err = os.Open(filePath)
+	// if err != nil {
+	// 	log.Fatal("Cannot open devops.log file", err)
+	// }
+	// fmt.Println(filePath)
+	// return file
 	// defer file.Close()
 }
 
@@ -60,7 +63,7 @@ func createLoggers(file *os.File) (loggero, loggerf hclog.Logger) {
 	loggero = hclog.New(&hclog.LoggerOptions{
 		Name:   "devops",
 		Output: os.Stdout,
-		Level:  hclog.Info,
+		Level:  hclog.Debug,
 	})
 
 	loggerf = hclog.New(&hclog.LoggerOptions{
@@ -84,6 +87,9 @@ func loadConfig(devopsDir string) *model.Config {
 				{
 					Name: "kubernetes",
 				},
+				// {
+				// 	Name: "aws",
+				// },
 			},
 		}
 	} else if !os.IsExist(err) && err != nil {

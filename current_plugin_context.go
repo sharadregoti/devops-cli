@@ -55,7 +55,6 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, app *views.Applicat
 	app.GeneralInfoView.Refresh(info)
 	app.IsolatorView.SetDefault(isolator)
 	app.IsolatorView.SetTitle(strings.Title(defaultIsolatorType))
-	app.PluginView.Refresh(map[string]string{"ctrl-a": p.Name()})
 
 	return &CurrentPluginContext{
 		currentPluginName:      pluginName,

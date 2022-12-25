@@ -1,0 +1,27 @@
+kind: source
+spec:
+  # Source spec section
+  name: aws
+  path: cloudquery/aws
+  version: "v8.1.0"
+  tables: 
+  - "aws_ec2_instances"
+  # - "aws_s3_buckets"
+  # - "aws_regions"
+  destinations: ["sqlite"]
+  spec: 
+    # AWS Spec section described below
+    # regions: 
+    #   - us-east-1
+    # accounts:
+    #   - id: "account1"
+    #     local_profile: "account1"
+    # aws_debug: false
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v1.1.0"
+  spec:
+    connection_string: ./db.sql

@@ -13,6 +13,9 @@ type Event struct {
 
 	// Specific Action
 	SpecificActionName string
+
+	// Plugin
+	PluginName string
 }
 
 const (
@@ -44,4 +47,7 @@ const (
 
 	// Specific Action
 	SpecificActionOccured = "specific-action-occured"
+
+	// Plugin
+	PluginChanged = "plugin-change"
 )

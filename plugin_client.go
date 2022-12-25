@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -26,8 +27,6 @@ type PluginClient struct {
 	stdOutReader *io.PipeReader
 	stdOutWriter *io.PipeWriter
 }
-
-var reader, writer = io.Pipe()
 
 // handshakeConfigs are used to just do a basic handshake between
 // a plugin and host. If the handshake fails, a user friendly error is shown.
@@ -59,9 +58,12 @@ func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient,
 	gob.Register(map[string]interface{}{})
 	gob.Register([]interface{}{})
 	gob.Register(make(chan shared.WatchResourceResult))
+	gob.Register(time.Time{})
 
 	path := getPluginPath(pluginName, rootDir)
-	logger.Debug("Pluging path")
+	logger.Debug("Pluging path", path)
+
+	var reader, writer = io.Pipe()
 
 	// We're a host! Start by launching the plugin process.
 	client := plugin.NewClient(&plugin.ClientConfig{
@@ -88,12 +90,25 @@ func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient,
 	}
 
 	return &PluginClient{
-		client: rpcClient,
-		logger: logger,
+		name: pluginName,
+		// TODO: Set error writer as well
+		stdErrReader: nil,
+		stdErrWriter: nil,
+		stdOutReader: reader,
+		stdOutWriter: writer,
+		client:       rpcClient,
+		logger:       logger,
 	}, nil
 }
 
+func (p *PluginClient) GetStdoutReader() *io.PipeReader {
+	return p.stdOutReader
+}
+
 func (p *PluginClient) Close() {
+	// TODO: close error writer as well
+	p.stdOutReader.Close()
+	p.stdOutWriter.Close()
 	p.client.Close()
 }
 

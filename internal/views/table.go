@@ -3,6 +3,7 @@ package views
 import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"github.com/sharadregoti/devops/model"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -39,18 +40,18 @@ func (m *MainView) SetTitle(title string) {
 	m.GetView().SetTitle(cases.Title(language.AmericanEnglish).String(title))
 }
 
-func (m *MainView) Refresh(data [][]string) {
+func (m *MainView) Refresh(data []*model.TableRow) {
 	m.GetView().Clear()
 
 	for r, cols := range data {
-		for c, col := range cols {
+		for c, col := range cols.Data {
 			// Set header
 			if r < 1 {
 				m.SetHeaderCell(r, c, col)
 				continue
 			}
 
-			m.SetCell(r, c, col)
+			m.SetCell(r, c, col, cols.Color)
 		}
 	}
 }
@@ -58,13 +59,13 @@ func (m *MainView) Refresh(data [][]string) {
 func (m *MainView) SetHeaderCell(x, y int, text string) {
 	m.view.SetCell(x, y,
 		tview.NewTableCell(text).
-			SetTextColor(tcell.ColorYellow).
+			SetTextColor(tcell.ColorWhite).
 			SetAlign(tview.AlignLeft).SetExpansion(1))
 }
 
-func (m *MainView) SetCell(x, y int, text string) {
+func (m *MainView) SetCell(x, y int, text string, color tcell.Color) {
 	m.view.SetCell(x, y,
 		tview.NewTableCell(text).
-			SetTextColor(tcell.ColorWhite).
+			SetTextColor(color).
 			SetAlign(tview.AlignLeft).SetExpansion(1))
 }

@@ -179,6 +179,19 @@ func (a *Application) ViewModel(rType, rName string) {
 func (a *Application) SetKeyboardShortCuts() {
 	a.rootView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 
+		// if tcell.ModAlt != 0 {
+		// 	for i, pluginName := range a.PluginView.data {
+		// 		numToRune := fmt.Sprintf("%d", i)[0]
+		// 		if event.Rune() == rune(numToRune) {
+		// 			a.eventChan <- model.Event{
+		// 				Type:       model.PluginChanged,
+		// 				PluginName: pluginName,
+		// 			}
+		// 			return event
+		// 		}
+		// 	}
+		// }
+
 		switch event.Key() {
 
 		case tcell.KeyRune:
@@ -262,6 +275,7 @@ func (a *Application) SetKeyboardShortCuts() {
 				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
 			}
 
+			// case tcell.ctrl
 		case tcell.KeyCtrlA:
 			if a.rootView.GetItemCount() == 2 {
 				a.rootView.AddItem(a.SearchView.GetView(), 2, 1, true)

@@ -5,6 +5,7 @@ builds:
   - id: devops-core
     flags:
     - -tags=release
+    main: ./cmd/devops
     goos:
       - linux
       # - windows
@@ -12,7 +13,7 @@ builds:
   - id: devops-kubernetes-plugin
     flags:
     - -tags=release  
-    main: ./plugin
+    main: ./plugin/kubernetes/kubernetes
     binary: kubernetes
     goos:
       - linux

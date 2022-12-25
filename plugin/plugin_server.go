@@ -1,5 +1,12 @@
 package main
 
+// import "github.com/sharadregoti/devops/plugin/aws"
+
+// func main() {
+// 	aws.Check()
+// 	aws.ColNames()
+// }
+
 // import (
 // 	"encoding/gob"
 // 	"fmt"

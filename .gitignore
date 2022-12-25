@@ -16,6 +16,7 @@
 devops
 plugin/plugin
 plugin/kubernetes/kubernetes/kubernetes
+plugin/aws/aws/aws
 
 *.csv
 
