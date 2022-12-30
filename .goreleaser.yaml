@@ -28,9 +28,9 @@ archives:
     - devops-core
     id: devops-core
     replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
+      # darwin: Darwin
+      # linux: Linux
+      # windows: Windows
       386: i386
       amd64: x86_64
   - builds:
@@ -42,9 +42,9 @@ archives:
         dst: resource_config
         strip_parent: true
     replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
+      # darwin: Darwin
+      # linux: Linux
+      # windows: Windows
       386: i386
       amd64: x86_64
 checksum:

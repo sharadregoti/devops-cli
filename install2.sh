@@ -25,7 +25,8 @@ getSystemInfo() {
     case $ARCH in
         armv7*) ARCH="arm";;
         aarch64) ARCH="arm64";;
-        x86_64) ARCH="amd64";;
+        x86_64) ARCH="x86_64";;
+        386) ARCH="i386";;
     esac
 
     OS=$(echo `uname`|tr '[:upper:]' '[:lower:]')
@@ -38,7 +39,7 @@ getSystemInfo() {
 
 verifySupported() {
 
-    local supported=(darwin-amd64 linux-amd64)
+    local supported=(darwin-amd64 linux-amd64 darwin-x86_64 linux-x86_64 darwin-i386 linux-i386)
 
     local current_osarch="${OS}-${ARCH}"
 
@@ -77,7 +78,7 @@ checkHttpRequestCLI() {
 checkExistingDapr() {
     if [ -f "$SPACE_CLI_FILE" ]; then
         echo -e "\nDevops CLI is detected:"
-        $SPACE_CLI_FILE --version
+        $SPACE_CLI_FILE version
         echo -e "Reinstalling Devops CLI - ${SPACE_CLI_FILE}...\n"
     else
         echo -e "Installing Devops CLI...\n"
@@ -100,8 +101,9 @@ getLatestRelease() {
 downloadFile() {
     LATEST_RELEASE_TAG=$1
 
-    SPACE_CLI_ARTIFACT="space-cli-${LATEST_RELEASE_TAG}.tar.gz"
-    DOWNLOAD_BASE="https://storage.googleapis.com/space-cloud/${OS}"
+    SPACE_CLI_ARTIFACT="devops_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
+    # https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/devops_0.1.0_Linux_arm64.tar.gz
+    DOWNLOAD_BASE="https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0"
     DOWNLOAD_URL="${DOWNLOAD_BASE}/${SPACE_CLI_ARTIFACT}"
 
     # Create the temp directory
@@ -119,6 +121,35 @@ downloadFile() {
         echo "failed to download $DOWNLOAD_URL ..."
         exit 1
     fi
+
+    
+    # For plugins
+    # Check if the ".devops" directory already exists in the home directory
+    if [ ! -d "$HOME/.devops" ]; then
+    # If it doesn't exist, create it
+    mkdir "$HOME/.devops"
+    fi
+
+    # Check if the ".devops/plugins" directory already exists in the home directory
+    if [ ! -d "$HOME/.devops/plugins" ]; then
+    # If it doesn't exist, create it
+    mkdir "$HOME/.devops/plugins"
+    fi
+
+    # Check if the ".devops/plugins" directory already exists in the home directory
+    if [ ! -d "$HOME/.devops/plugins/kubernetes" ]; then
+    # If it doesn't exist, create it
+    mkdir "$HOME/.devops/plugins/kubernetes"
+    fi
+
+    SPACE_CLI_ARTIFACT="devops-kubernetes-plugin_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
+    DOWNLOAD_URL="${DOWNLOAD_BASE}/${SPACE_CLI_ARTIFACT}"
+
+    echo "Downloading kubernetes plugin"
+
+    wget -O "$HOME/.devops/plugins/kubernetes/devops.tar.gz" "${DOWNLOAD_URL}"
+    tar -xzf "$HOME/.devops/plugins/kubernetes/devops.tar.gz" -C "$HOME/.devops/plugins/kubernetes"
+
 }
 
 installFile() {
@@ -137,8 +168,8 @@ installFile() {
         echo "$SPACE_CLI_FILENAME installed into $SPACE_CLI_INSTALL_DIR successfully."
         RED='\033[0;34m'
         NC='\033[0m' # No Color
-        echo -e "For enabling auto complete follow instructions provided by this command ${RED}space-cli completion --help${NC}"
-        $SPACE_CLI_FILE --version
+        # echo -e "For enabling auto complete follow instructions provided by this command ${RED}space-cli completion --help${NC}"
+        # $SPACE_CLI_FILE --version
     else
         echo "Failed to install $SPACE_CLI_FILENAME"
         exit 1
@@ -149,7 +180,7 @@ fail_trap() {
     result=$?
     if [ "$result" != "0" ]; then
         echo "Failed to install Devops CLI"
-        echo "For support, go to https://docs.spaceuptech.com/install/"
+        echo "For support, go to https://github.com/sharadregoti/devops-cli"
     fi
     cleanup
     exit $result
@@ -162,7 +193,7 @@ cleanup() {
 }
 
 installCompleted() {
-    echo -e "\nTo get started with Space Cloud, please visit https://learn.spaceuptech.com/space-cloud/basics/"
+    echo -e "\nTo get started with Space Cloud, please visit https://github.com/sharadregoti/devops-cli"
 }
 
 # -----------------------------------------------------------------------------
