@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sharadregoti/devops/common"
+
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/sharadregoti/devops/shared"
@@ -18,7 +20,7 @@ import (
 // // Execute the command
 // _, err := exec.Command(command, arguments...).Output()
 // if err != nil {
-// 	d.logger.Error(fmt.Sprintf("failed to get describe output, got %v", err))
+// 	d.common.Error(a.logger,fmt.Sprintf("failed to get describe output, got %v", err))
 // 	return nil, err
 // }
 
@@ -29,7 +31,7 @@ func (a *AWS) getResourceTypes() ([]string, error) {
 	// Open a connection to the SQLite database
 	db, err := sql.Open("sqlite3", "../../plugin/aws/resource_config/db.sql")
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 	defer db.Close()
@@ -37,7 +39,7 @@ func (a *AWS) getResourceTypes() ([]string, error) {
 	// Get all the table names from the database
 	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table'")
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 	defer rows.Close()
@@ -48,7 +50,7 @@ func (a *AWS) getResourceTypes() ([]string, error) {
 	for rows.Next() {
 		err := rows.Scan(&tableName)
 		if err != nil {
-			a.logger.Error(err.Error())
+			common.Error(a.logger, err.Error())
 			return nil, err
 		}
 
@@ -56,7 +58,7 @@ func (a *AWS) getResourceTypes() ([]string, error) {
 	}
 	err = rows.Err()
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 	return result, nil
@@ -66,7 +68,7 @@ func (a *AWS) listResources(args shared.GetResourcesArgs) ([]interface{}, error)
 	// Open a connection to the SQLite database
 	db, err := sql.Open("sqlite3", "../../plugin/aws/resource_config/db.sql")
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 	defer db.Close()
@@ -75,7 +77,7 @@ func (a *AWS) listResources(args shared.GetResourcesArgs) ([]interface{}, error)
 	// aws_ec2_instances
 	rows, err := db.Query(fmt.Sprintf("select * from aws_%s", args.ResourceType))
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 	defer rows.Close()
@@ -83,7 +85,7 @@ func (a *AWS) listResources(args shared.GetResourcesArgs) ([]interface{}, error)
 	// Get the column names from the rows
 	columns, err := rows.Columns()
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 
@@ -99,7 +101,7 @@ func (a *AWS) listResources(args shared.GetResourcesArgs) ([]interface{}, error)
 	for rows.Next() {
 		err := rows.Scan(values...)
 		if err != nil {
-			a.logger.Error(err.Error())
+			common.Error(a.logger, err.Error())
 			return nil, err
 		}
 
@@ -117,7 +119,7 @@ func (a *AWS) listResources(args shared.GetResourcesArgs) ([]interface{}, error)
 	}
 	err = rows.Err()
 	if err != nil {
-		a.logger.Error(err.Error())
+		common.Error(a.logger, err.Error())
 		return nil, err
 	}
 

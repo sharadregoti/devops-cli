@@ -117,9 +117,24 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 
 	// This is here because during the search we if we press any rune key that corresponding function get triggered
 	m.view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEnter && act.nestingEnabled {
+			row, _ := m.view.GetSelection()
+			if row == 0 {
+				return nil
+			}
+			c <- model.Event{
+				Type:         model.ViewNestedResource,
+				RowIndex:     row,
+				ResourceName: m.view.GetCell(row, 1).Text,
+			}
+			return event
+		}
 		if event.Key() == tcell.KeyRune {
 			// Specific Action Checks
 			row, _ := m.view.GetSelection()
+			if row == 0 {
+				return nil
+			}
 			for _, action := range sa.actions {
 				// TODO: Validate key bindings
 				stringToRune := action.KeyBinding[0]
@@ -129,6 +144,7 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 						SpecificActionName: action.Name,
 						ResourceName:       m.view.GetCell(row, 1).Text,
 					}
+					return event
 				}
 			}
 		}
@@ -191,12 +207,35 @@ func (a *Application) SetKeyboardShortCuts() {
 		// 		}
 		// 	}
 		// }
+		if event.Key() == tcell.KeyEscape {
+			row, _ := a.MainView.view.GetSelection()
+			// if row == 0 {
+			// 	return event
+			// }
+			a.eventChan <- model.Event{
+				Type:     model.NestBack,
+				RowIndex: row,
+			}
+			return event
+		}
 
 		switch event.Key() {
+
+		// case tcell.KeyEnter:
+		// 	// Specific action chec
+		// 	a.eventChan <- model.Event{
+		// 		Type:         model.ResourceTypeChanged,
+		// 		RowIndex:     0,
+		// 		ResourceType: "pods",
+		// 		IsolatorName: "default",
+		// 	}
 
 		case tcell.KeyRune:
 			if event.Rune() == 'u' {
 				row, _ := a.MainView.view.GetSelection()
+				if row == 0 {
+					return event
+				}
 				a.eventChan <- model.Event{
 					Type: model.AddIsolator,
 					// +1 because "name" is always the second column that indicates the isolator name
@@ -305,7 +344,7 @@ func (a *Application) SetFlashText(text string) {
 	a.rootView.AddItem(a.FlashView.GetView(), 2, 1, true)
 	a.FlashView.SetText(text)
 	go func() {
-		<-time.After(5 * time.Second)
+		<-time.After(3 * time.Second)
 		a.rootView.RemoveItem(a.FlashView.GetView())
 		a.application.Draw()
 	}()

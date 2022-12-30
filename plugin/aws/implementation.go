@@ -13,7 +13,7 @@ func (d *AWS) Name() string {
 
 // TODO: test & fix this
 func (d *AWS) StatusOK() error {
-	// d.logger.Error(fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
+	// d.common.Error(fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
 	return nil
 }
 

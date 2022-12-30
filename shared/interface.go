@@ -14,7 +14,8 @@ type Devops interface {
 }
 
 type GetResourcesArgs struct {
-	ResourceType, IsolatorID string
+	ResourceName, ResourceType, IsolatorID string
+	Args                                   map[string]interface{}
 }
 
 type MainBox interface {
@@ -81,6 +82,8 @@ type SpecificActionArgs struct {
 	ResourceType string
 
 	IsolatorName string
+
+	Args map[string]interface{}
 }
 
 type SpecificActionResult struct {

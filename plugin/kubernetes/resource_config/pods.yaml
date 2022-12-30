@@ -32,6 +32,14 @@ operations:
     json_paths: 
     - path: "metadata.creationTimestamp|@age"
     output_format: ""
+nesting:
+  is_nested: true
+  resource_type: "containers"
+  args:
+  is_self_contained_in_parent: true
+  parent_data_paths : 
+  - spec.containers
+  - spec.initContainers
 styles:
   - row_background_color: red
     conditions:

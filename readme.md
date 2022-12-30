@@ -1,4 +1,4 @@
-# Devops CLI: A tool to do DevOps in style
+# Devops CLI: A swiss army knife for doing DevOps
 
 A plugin based Terminal UI to interact with devops tools & services, intended for devops/platform engineers.
 

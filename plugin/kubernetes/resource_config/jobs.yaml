@@ -7,18 +7,9 @@ operations:
     json_paths: 
     - path: "metadata.name"
     output_format: ""
-  - name: "ready"
-    json_paths:
-    - path: "status.readyReplicas"
-    - path: "status.replicas"
-    output_format: "%v/%v"
-  - name: "up-to-date"
-    json_paths:
-    - path: "status.readyReplicas"
-    output_format: ""
-  - name: "available"
+  - name: "status"
     json_paths: 
-    - path: "status.availableReplicas"
+    - path: "status.phase"
     output_format: ""
   - name: "age"
     json_paths: 

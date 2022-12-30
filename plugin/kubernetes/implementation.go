@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 func (d *Kubernetes) Name() string {
@@ -15,12 +18,25 @@ func (d *Kubernetes) Name() string {
 
 // TODO: test & fix this
 func (d *Kubernetes) StatusOK() error {
-	d.logger.Error(fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
+	common.Error(d.logger, fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
 	return d.isOK
 }
 
 func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, error) {
-	items, err := d.listResources(context.Background(), args)
+
+	label := ""
+	for k, v := range args.Args {
+		if k == "labels" {
+			selector := labels.NewSelector()
+			for labelKey, labelValue := range v.(map[string]interface{}) {
+				l2, _ := labels.NewRequirement(labelKey, selection.Equals, []string{labelValue.(string)})
+				selector = selector.Add(*l2)
+			}
+			label = selector.String()
+		}
+	}
+
+	items, err := d.listResources(context.Background(), args, label)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +76,7 @@ func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResou
 		r := d.resourceTypes[resourceType]
 		err := getResourcesDynamically(c, d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
 		if err != nil {
-			d.logger.Error("failed to watch over resource %s: %w", resourceType, err)
+			common.Error(d.logger, fmt.Sprintf("failed to watch over resource %s: %w", resourceType, err))
 			return
 		}
 	}()
@@ -174,10 +190,33 @@ func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shar
 		}, nil
 
 	case "logs":
-		d.getPodLogs(args.ResourceName, args.IsolatorName)
+
+		containerName := ""
+		if args.ResourceType == "containers" {
+			parentName := args.Args["parentName"]
+			args.ResourceType = "pods"
+			containerName = args.ResourceName
+			args.ResourceName = parentName.(string)
+		}
+
+		_, err := d.getPodLogs(args.ResourceName, args.IsolatorName, containerName)
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+
 		return shared.SpecificActionResult{
 			Result:     "",
 			OutputType: "string",
+		}, nil
+	case "view-pods":
+		res, err := d.getPods(context.Background(), args.IsolatorName, args.ResourceName, args.ResourceType)
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+		return shared.SpecificActionResult{
+			Result: res,
+			// TODO: Output type should come from an core SDK
+			OutputType: "invoke-event",
 		}, nil
 
 	case "close":

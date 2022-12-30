@@ -40,7 +40,7 @@ func (m *MainView) SetTitle(title string) {
 	m.GetView().SetTitle(cases.Title(language.AmericanEnglish).String(title))
 }
 
-func (m *MainView) Refresh(data []*model.TableRow) {
+func (m *MainView) Refresh(data []*model.TableRow, rowNum int) {
 	m.GetView().Clear()
 
 	for r, cols := range data {
@@ -54,6 +54,7 @@ func (m *MainView) Refresh(data []*model.TableRow) {
 			m.SetCell(r, c, col, cols.Color)
 		}
 	}
+	m.GetView().Select(rowNum, 0)
 }
 
 func (m *MainView) SetHeaderCell(x, y int, text string) {

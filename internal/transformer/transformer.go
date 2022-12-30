@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 
@@ -13,7 +14,56 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, error) {
+func GetSelfContainedResource(t *model.ResourceTransfomer, resource interface{}) ([]interface{}, error) {
+	// Extract real data from parent object
+
+	strData, err := json.Marshal(resource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal resource data: %w", err)
+	}
+
+	containedResources := []interface{}{}
+	for _, p := range t.Nesting.ParentDataPaths {
+		value := gjson.Get(string(strData), p)
+		switch v := value.Value().(type) {
+		case []interface{}:
+			containedResources = append(containedResources, v...)
+		case interface{}:
+			containedResources = append(containedResources, v)
+		case nil:
+			continue
+		default:
+			return nil, fmt.Errorf("failed to extract nested resource: json_path %v data is not of type of array got %v", p, reflect.TypeOf(v))
+		}
+	}
+	return containedResources, nil
+}
+
+func GetArgs(resource interface{}, args map[string]interface{}) map[string]interface{} {
+	strData, _ := json.Marshal(resource)
+	// if err != nil {
+	// 	return nil, nil, fmt.Errorf("failed to marshal resource data: %w", err)
+	// }
+
+	nestArgs := map[string]interface{}{}
+	for k, v := range args {
+		strV, ok := v.(string)
+		if ok {
+			gjsonValue := gjson.Get(string(strData), strV)
+			if !gjsonValue.Exists() {
+				nestArgs[k] = strV
+				continue
+			}
+			nestArgs[k] = gjsonValue.Value()
+		} else {
+			nestArgs[k] = v
+		}
+	}
+
+	return nestArgs
+}
+
+func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
 	gjson.AddModifier("age", func(json, arg string) string {
 		return getAge(json[1 : len(json)-1])
 	})
@@ -29,26 +79,44 @@ func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface
 	tableResult = append(tableResult, headerRow)
 	// copy(tableResult[len(tableResult)-1], headerRow)
 
-	for _, v := range resources {
-		res, err := TransformResource(t, v)
+	nestArgs := []map[string]interface{}{}
+	for _, resource := range resources {
+		res, nestArg, err := TransformResource(t, resource)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		tableResult = append(tableResult, res)
 		// copy(tableResult[len(tableResult)-1], res)
+
+		if t.Nesting.IsNested {
+			nestArgs = append(nestArgs, nestArg)
+		}
 	}
 
-	return tableResult, nil
+	return tableResult, nestArgs, nil
 }
 
-func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.TableRow, error) {
+func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
 	resultRow := new(model.TableRow)
 	dataRow := make([]string, 0)
 
 	strData, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal resource data: %w", err)
+		return nil, nil, fmt.Errorf("failed to marshal resource data: %w", err)
+	}
+
+	nestArgs := map[string]interface{}{}
+	if t.Nesting.IsNested {
+		for k, v := range t.Nesting.Args {
+			strV, ok := v.(string)
+			if ok {
+				gjsonValue := gjson.Get(string(strData), strV)
+				nestArgs[k] = gjsonValue.Value()
+			} else {
+				nestArgs[k] = v
+			}
+		}
 	}
 
 	// Get column names in title case
@@ -80,12 +148,12 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.Ta
 			// fmt.Println("here")
 			output, err := expr.Eval(c, data)
 			if err != nil {
-				return nil, fmt.Errorf("failed to evaluate style condition: %v", err)
+				return nil, nil, fmt.Errorf("failed to evaluate style condition: %v", err)
 			}
 
 			result, ok := output.(bool)
 			if !ok {
-				return nil, fmt.Errorf("condition evaluation resulted into an unknown type %v, expected boolean", result)
+				return nil, nil, fmt.Errorf("condition evaluation resulted into an unknown type %v, expected boolean", result)
 			}
 
 			if !result {
@@ -108,7 +176,7 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.Ta
 		}
 	}
 
-	return resultRow, nil
+	return resultRow, nestArgs, nil
 }
 
 func getAge(ts string) string {

@@ -48,7 +48,7 @@ package main
 
 // 	pluginK8s, err := pnk8s.New(logger.Named("kubernetes"))
 // 	if err != nil {
-// 		logger.Error(fmt.Sprintf("failed to initialized kubernetes plugin: %v", err))
+// 		common.Error(fmt.Sprintf("failed to initialized kubernetes plugin: %v", err))
 // 		// os.Exit(1)
 // 	}
 

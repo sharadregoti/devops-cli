@@ -6,7 +6,8 @@ import (
 )
 
 type Actions struct {
-	view *tview.TextView
+	view           *tview.TextView
+	nestingEnabled bool
 }
 
 func NewAction() *Actions {
@@ -17,6 +18,10 @@ func NewAction() *Actions {
 	return &Actions{
 		view: t,
 	}
+}
+
+func (g *Actions) EnableNesting(v bool) {
+	g.nestingEnabled = v
 }
 
 func (g *Actions) RefreshActions(data shared.GenericActions) {

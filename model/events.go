@@ -48,6 +48,10 @@ const (
 	// Specific Action
 	SpecificActionOccured = "specific-action-occured"
 
+	ViewNestedResource = "view-nested-resource"
+
 	// Plugin
 	PluginChanged = "plugin-change"
+
+	NestBack = "nest-back"
 )

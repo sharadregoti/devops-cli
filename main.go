@@ -7,8 +7,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/sharadregoti/devops/common"
+	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
@@ -19,10 +22,10 @@ import (
 // Installing VS Code Server for x64 (1ad8d514439d5077d2b0b7ee64d2ce82a9308e5a)
 // Downloading:  80%
 
-var release bool = false
+// var release bool = false
 
 func getPluginPath(name, devopsDir string) string {
-	if release {
+	if common.Release {
 		return fmt.Sprintf("%s/plugins/%s/%s", devopsDir, name, name)
 	}
 	return fmt.Sprintf("../../plugin/%s/%s/%s", name, name, name)
@@ -48,16 +51,19 @@ func Init() {
 
 	pc, err := loadPlugin(loggerf, initialPlugin.Name, devopsDir)
 	if err != nil {
+		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
 
 	kp, err := pc.GetPlugin(initialPlugin.Name)
 	if err != nil {
+		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
 
 	if err := kp.StatusOK(); err != nil {
-		loggero.Error("failed to load plugin", err)
+		common.Error(loggero, fmt.Sprintf("failed to load plugin: %v", err))
+		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
 
@@ -69,6 +75,7 @@ func Init() {
 	// Initiate global plugin contexts
 	pCtx, err := initPluginContext(loggerf, kp, app, initialPlugin.Name)
 	if err != nil {
+		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
 
@@ -94,12 +101,26 @@ func Init() {
 	isStreamingOn := false
 	// invokingFirstTime := true
 
+	// nestedResourceLevel := -1
+
 	go func() {
 		for event := range eventChan {
+			loggerf.Debug("\n")
+			loggerf.Debug("====================================================================================================================")
 			data, _ := json.MarshalIndent(event, " ", " ")
 			loggerf.Debug(fmt.Sprintf("Received event %v", string(data)))
 
 			switch event.Type {
+
+			case model.ViewNestedResource:
+				if !pCtx.getCurrentResource().currentSchema.Nesting.IsNested {
+					loggerf.Debug("False alarm for nested resource occured")
+				}
+				pCtx.syncResource(event)
+
+			case model.NestBack:
+				loggerf.Debug("Nest", pCtx.currentNestedResourceLevel)
+				pCtx.viewBackwardNestResource(event)
 
 			case model.PluginChanged:
 				pc.Close()
@@ -132,7 +153,7 @@ func Init() {
 					}
 					_, err := kp.PerformSpecificAction(fnArgs)
 					if err != nil {
-						loggerf.Error("failed to perform close action on resource", err)
+						common.Error(loggerf, fmt.Sprintf("failed to perform close action on resource: %v", err))
 						continue
 					}
 					streamCloserChan <- struct{}{}
@@ -141,27 +162,37 @@ func Init() {
 
 			// Specfic action on resource
 			case model.SpecificActionOccured:
-				fnArgs := shared.SpecificActionArgs{
-					ActionName:   event.SpecificActionName,
-					ResourceName: event.ResourceName,
-					ResourceType: pCtx.currentResourceType,
-					IsolatorName: pCtx.currentIsolator,
-				}
-
-				loggerf.Debug("Specific action args", fnArgs)
-				res, err := kp.PerformSpecificAction(fnArgs)
-				if err != nil {
-					loggerf.Error("failed to perform specific action on resource", err)
-					continue
-				}
-
-				action := shared.SpecificAction{}
-				for _, sa := range pCtx.currentSpecficActionList {
+				action := model.SpecificActions{}
+				rs := pCtx.getCurrentResource()
+				for _, sa := range rs.currentSchema.SpecificActions {
 					if sa.Name == event.SpecificActionName {
 						action = sa
 					}
 				}
 				if action.Name == "" {
+					continue
+				}
+
+				specArgs := map[string]interface{}{}
+				if len(action.Args) > 0 {
+					prev := pCtx.getPreviousResource()
+					// loggerf.Debug(fmt.Sprintf("DDDD %v, %v", prev.currentResources[prev.tableRowNumber-1], action.Args))
+					specArgs = transformer.GetArgs(prev.currentResources[prev.tableRowNumber-1], action.Args)
+				}
+
+				fnArgs := shared.SpecificActionArgs{
+					ActionName:   event.SpecificActionName,
+					ResourceName: event.ResourceName,
+					ResourceType: rs.currentResourceType,
+					IsolatorName: pCtx.currentIsolator,
+					Args:         specArgs,
+				}
+
+				loggerf.Debug("Specific action args", fnArgs)
+				res, err := kp.PerformSpecificAction(fnArgs)
+				if err != nil {
+					common.Error(loggerf, fmt.Sprintf("failed to perform specific action on resource: %v", err))
+					app.SetFlashText(err.Error())
 					continue
 				}
 
@@ -187,16 +218,16 @@ func Init() {
 							for {
 								select {
 								case <-streamCloserChan:
-									// loggerf.Debug("Streamer go routine closed")
-									// return
+									loggerf.Debug("Streamer go routine closed")
+									return
 								default:
 									data, _, err := newReader.ReadLine()
 									// data, err := newReader.ReadString(byte('\n'))
 									if err == io.EOF {
-										loggerf.Error("EOF received while streaming", err)
+										common.Error(loggerf, fmt.Sprintf("EOF received while streaming: %v", err))
 										break
 									} else if err != nil {
-										loggerf.Error("failed to stream data", err)
+										common.Error(loggerf, fmt.Sprintf("failed to stream data: %v", err))
 										break
 									}
 									w := app.Ta.BatchWriter()
@@ -216,14 +247,16 @@ func Init() {
 
 			// Isolator actions
 			case model.IsolatorChanged:
-				event.ResourceType = pCtx.currentResourceType
-				pCtx.setCurrentIsolator(event.IsolatorName)
-				syncResource(loggerf, event, kp, pCtx, app)
+				event.ResourceType = pCtx.getCurrentResource().currentResourceType
+				// pCtx.setCurrentIsolator(event.IsolatorName)
+				// pCtx.resetToParentResource()
+				pCtx.syncResource(event)
 
 			case model.AddIsolator:
 				if event.ResourceType != pCtx.defaultIsolatorType {
 					continue
 				}
+				// pCtx.clearNestedResource()
 				app.IsolatorView.AddAndRefreshView(event.IsolatorName)
 				app.GetApp().Draw()
 
@@ -231,7 +264,7 @@ func Init() {
 			case model.ReadResource:
 				// -1 because, table data index starts with 1 and on
 				// The data stored in array starts with 0 index, So 1 table row maps with 0 of array row
-				data := pCtx.currentResources[event.RowIndex-1]
+				data := pCtx.getCurrentResource().currentResources[event.RowIndex-1]
 				// TODO: Take format type from plugin
 				dd, _ := yaml.Marshal(data)
 				app.SetTextAndSwitchView(string(dd))
@@ -239,13 +272,13 @@ func Init() {
 
 			case model.DeleteResource:
 				if err := kp.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: event.ResourceName, ResourceType: event.ResourceType, IsolatorName: event.IsolatorName}); err != nil {
-					loggerf.Error("failed to delete resource", err)
+					common.Error(loggerf, fmt.Sprintf("failed to delete resource: %v", err))
 					continue
 				}
 				app.SwitchToMain()
 
 			case model.RefreshResource:
-				syncResource(loggerf, event, kp, pCtx, app)
+				pCtx.syncResource(event)
 
 			case model.ResourceTypeChanged:
 				// TODO: Handle wrong resource names
@@ -254,7 +287,14 @@ func Init() {
 					continue
 				}
 
-				if event.ResourceType == pCtx.currentResourceType {
+				loggerf.Debug("Normal resource activated")
+				// if pCtx.areWeViewingNestedResource() {
+				// 	loggerf.Debug("Nested resource activated")
+				// 	pCtx.syncNestResource(event)
+				// 	continue
+				// }
+
+				if rs := pCtx.getCurrentResource(); rs != nil && event.ResourceType == rs.currentResourceType {
 					loggerf.Debug("Current & new resource type are the same, Ignoring this event")
 					continue
 				}
@@ -266,7 +306,7 @@ func Init() {
 				// 	invokingFirstTime = true
 				// }
 
-				syncResource(loggerf, event, kp, pCtx, app)
+				pCtx.syncResource(event)
 
 				// go func() {
 				// 	for {
@@ -288,7 +328,8 @@ func Init() {
 	}()
 
 	if err := app.Start(); err != nil {
-		loggerf.Error("failed to start application", err)
+		common.Error(loggerf, fmt.Sprintf("failed to start application: %v", err))
+		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
 }

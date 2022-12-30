@@ -1,17 +1,42 @@
 package core
 
 import (
+	"fmt"
 	"strings"
 
 	hclog "github.com/hashicorp/go-hclog"
+	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
 )
 
+// Node represents a node of linked list
+type Node struct {
+	value int
+	next  *Node
+}
+
+// LinkedList represents a linked list
+type LinkedList struct {
+	head *Node
+	len  int
+}
+
 type CurrentPluginContext struct {
+	logger hclog.Logger
+
 	currentPluginName string
+
+	// This field indicates current nest level
+	// The value corresponds to the
+	currentNestedResourceLevel int
+	// This field holds the nested resources of the parent resource
+
+	plugin shared.Devops
+
+	appView *views.Application
 
 	generalInfo         map[string]string
 	defaultIsolator     string
@@ -19,11 +44,58 @@ type CurrentPluginContext struct {
 	currentIsolator     string
 
 	supportedResourceTypes []string
-	currentResourceType    string
+	// currentResourceType    string
 
-	currentResources []interface{}
-	currentSchema    model.ResourceTransfomer
+	// currentResources []interface{}
+	// currentSchema    model.ResourceTransfomer
 
+	currentGenericActions shared.GenericActions
+	// currentSpecficActionList []shared.SpecificAction
+
+	tableStack tableStack
+}
+
+type tableStack []*resourceStack
+
+func (t *tableStack) length() int {
+	return len(*t)
+}
+
+func (t *tableStack) upsert(index int, r resourceStack) {
+	for i, _ := range *t {
+		if i == index {
+			(*t)[0] = &r
+			return
+		}
+	}
+
+	// Add if does not exists
+	*t = append(*t, &r)
+}
+
+func (t *tableStack) resetToParentResource() {
+	// Only get the first element
+	if len(*t) == 0 {
+		return
+	}
+	*t = (*t)[0:1]
+}
+
+type resourceStack struct {
+	tableRowNumber           int
+	nextResourceArgs         []map[string]interface{}
+	currentResourceType      string
+	currentResources         []interface{}
+	currentSchema            model.ResourceTransfomer
+	currentSpecficActionList []shared.SpecificAction
+}
+
+type nestedResurce struct {
+	nextResourceArgs         []map[string]interface{}
+	currentIsolator          string
+	currentResourceType      string
+	currentResources         []interface{}
+	currentSchema            model.ResourceTransfomer
 	currentSpecficActionList []shared.SpecificAction
 }
 
@@ -31,23 +103,23 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, app *views.Applicat
 	// Get known changing infor
 	info, err := p.GetGeneralInfo()
 	if err != nil {
-		logger.Error("initial resource fetching failed", err)
+		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
 	isolator, err := p.GetDefaultResourceIsolator()
 	if err != nil {
-		logger.Error("initial resource fetching failed", err)
+		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
 	resourceTypeList, err := p.GetResourceTypeList()
 	if err != nil {
-		logger.Error("initial resource fetching failed", err)
+		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
 
 	defaultIsolatorType, err := p.GetResourceIsolatorType()
 	if err != nil {
-		logger.Error("initial resource fetching failed", err)
+		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
 
@@ -57,78 +129,278 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, app *views.Applicat
 	app.IsolatorView.SetTitle(strings.Title(defaultIsolatorType))
 
 	return &CurrentPluginContext{
-		currentPluginName:      pluginName,
-		generalInfo:            info,
-		defaultIsolatorType:    defaultIsolatorType,
-		currentIsolator:        isolator,
-		defaultIsolator:        isolator,
-		currentResourceType:    "",
-		currentResources:       make([]interface{}, 0),
+		logger:              logger,
+		currentPluginName:   pluginName,
+		plugin:              p,
+		appView:             app,
+		generalInfo:         info,
+		defaultIsolatorType: defaultIsolatorType,
+		currentIsolator:     isolator,
+		defaultIsolator:     isolator,
+		// currentResourceType:        "",
+		// currentResources:           make([]interface{}, 0),
 		supportedResourceTypes: resourceTypeList,
-		currentSchema:          model.ResourceTransfomer{},
+		// currentSchema:              model.ResourceTransfomer{},
+		currentNestedResourceLevel: 0,
+		tableStack:                 make([]*resourceStack, 0),
 	}, nil
+}
+
+func (c *CurrentPluginContext) resetToParentResource() {
+	c.tableStack.resetToParentResource()
+	c.currentNestedResourceLevel = 0
 }
 
 func (c *CurrentPluginContext) setCurrentIsolator(isolatorName string) {
 	c.currentIsolator = isolatorName
 }
 
-func syncResource(logger hclog.Logger, event model.Event, kp shared.Devops, pCtx *CurrentPluginContext, app *views.Application) {
-	schema, err := kp.GetResourceTypeSchema(event.ResourceType)
-	if err != nil {
-		logger.Error("failed to fetch resource type schema", err)
-		return
-	}
-	pCtx.currentSchema = schema
+// func (c *CurrentPluginContext) getSpecificActionList() []shared.SpecificAction {
+// 	if c.areWeViewingNestedResource() {
+// 		nest := c.nestedResources[c.currentNestedResourceLevel-1]
+// 		return nest.currentSpecficActionList
+// 	}
 
-	resources, err := kp.GetResources(shared.GetResourcesArgs{ResourceType: event.ResourceType, IsolatorID: pCtx.currentIsolator})
-	if err != nil {
-		logger.Error("failed to fetch resources", err)
+// 	return c.currentSpecficActionList
+// }
+
+func (c *CurrentPluginContext) areWeViewingNestedResource() bool {
+	return c.currentNestedResourceLevel > 0
+}
+
+func (c *CurrentPluginContext) viewBackwardNestResource(event model.Event) {
+	if c.currentNestedResourceLevel-1 == -1 {
 		return
 	}
-	pCtx.currentResources = resources
+	c.currentNestedResourceLevel--
+	if c.currentNestedResourceLevel == 0 {
+		c.resetToParentResource()
+	}
+	c.setAppView()
+}
+
+func (c *CurrentPluginContext) getCurrentResource() *resourceStack {
+	if c.tableStack.length() == 0 {
+		return nil
+	}
+	return c.tableStack[c.currentNestedResourceLevel]
+}
+
+func (c *CurrentPluginContext) getPreviousResource() *resourceStack {
+	if c.tableStack.length() == 0 {
+		return nil
+	}
+	return c.tableStack[c.currentNestedResourceLevel-1]
+}
+
+func (c *CurrentPluginContext) syncResource(event model.Event) {
+	var rs *resourceStack
+	var resourceLevel int
+	fnArgs := map[string]interface{}{}
+	if event.Type == model.ViewNestedResource {
+		rs = &resourceStack{
+			currentResourceType: c.getCurrentResource().currentSchema.Nesting.ResourceType,
+		}
+		resourceLevel = c.currentNestedResourceLevel + 1
+		fnArgs = c.getCurrentResource().nextResourceArgs[event.RowIndex-1]
+		c.getCurrentResource().tableRowNumber = event.RowIndex
+	} else if event.Type == model.ReadResource {
+		rs = c.getCurrentResource()
+	} else if event.Type == model.ResourceTypeChanged {
+		c.resetToParentResource()
+		rs = &resourceStack{
+			currentResourceType: event.ResourceType,
+		}
+	} else if event.Type == model.IsolatorChanged {
+		c.setCurrentIsolator(event.IsolatorName)
+		c.resetToParentResource()
+		rs = &resourceStack{
+			currentResourceType: event.ResourceType,
+		}
+	} else {
+		return
+	}
+
+	schema, err := c.plugin.GetResourceTypeSchema(rs.currentResourceType)
+	if err != nil {
+		common.Error(c.logger, fmt.Sprintf("failed to fetch resource type schema: %v", err))
+		return
+	}
+
+	var resources []interface{}
+	// TODO: Remove enent type condition from here
+	if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && parent.currentSchema.Nesting.IsSelfContainedInParent {
+		resources, err = transformer.GetSelfContainedResource(&parent.currentSchema, parent.currentResources[event.RowIndex-1])
+		if err != nil {
+			common.Error(c.logger, err.Error())
+			return
+		}
+	} else {
+		resources, err = c.plugin.GetResources(shared.GetResourcesArgs{ResourceType: rs.currentResourceType, IsolatorID: c.currentIsolator, Args: fnArgs})
+		if err != nil {
+			common.Error(c.logger, fmt.Sprintf("failed to fetch resources: %v", err))
+			return
+		}
+	}
 
 	if len(resources) == 0 {
-		app.SetFlashText(" !!! No resources exists ")
+		c.appView.SetFlashText("!!! No resources exists ")
 	}
 
-	table, err := transformer.GetResourceInTableFormat(&schema, resources)
+	// table, err := transformer.GetResourceInTableFormat(&schema, resources)
+	// if err != nil {
+	// 	common.Error(logger, "unable to convert resource data of type into table format", event.ResourceType, err)
+	// 	return
+	// }
+
+	actions, err := c.plugin.GetSupportedActions(rs.currentResourceType)
 	if err != nil {
-		logger.Error("unable to convert resource data of type into table format", event.ResourceType, err)
+		common.Error(c.logger, fmt.Sprintf("unable to get supported actions of resource: %v, %v", rs.currentResourceType, err))
+		return
+	}
+	c.currentGenericActions = actions
+
+	specificActions, err := c.plugin.GetSpecficActionList(rs.currentResourceType)
+	if err != nil {
+		common.Error(c.logger, fmt.Sprintf("unable to get specific actions of resource: %v, %v", rs.currentResourceType, err))
 		return
 	}
 
-	actions, err := kp.GetSupportedActions(event.ResourceType)
-	if err != nil {
-		logger.Error("unable to get supported actions of resource", event.ResourceType, err)
-		return
-	}
-
-	app.ActionView.RefreshActions(actions)
-
-	specificActions, err := kp.GetSpecficActionList(event.ResourceType)
-	if err != nil {
-		logger.Error("unable to get specific actions of resource", event.ResourceType, err)
-		return
-	}
-
-	if event.ResourceType == pCtx.defaultIsolatorType {
+	if rs.currentResourceType == c.defaultIsolatorType {
 		specificActions = append(specificActions, shared.SpecificAction{Name: "Use", KeyBinding: "u"})
 	}
-	app.SpecificActionView.RefreshActions(specificActions)
-	pCtx.currentSpecficActionList = specificActions
+	// c.currentSpecficActionList = specificActions
 
-	pCtx.currentResourceType = event.ResourceType
+	// c.currentResourceType = event.ResourceType
+	c.currentNestedResourceLevel = resourceLevel
 
-	logger.Debug("Removing search view")
-	app.RemoveSearchView()
-	logger.Debug("Refreshing table")
-	app.MainView.Refresh(table)
-	app.MainView.SetTitle(event.ResourceType)
-	logger.Debug("Setting focus to main view")
-	app.GetApp().SetFocus(app.MainView.GetView())
-	// if event.Type != model.RefreshResource {
-	app.GetApp().Draw()
-	// }
-	logger.Debug("Activation done")
+	c.tableStack.upsert(resourceLevel, resourceStack{
+		currentResourceType:      rs.currentResourceType,
+		currentResources:         resources,
+		currentSchema:            schema,
+		currentSpecficActionList: specificActions,
+		nextResourceArgs:         []map[string]interface{}{},
+	})
+
+	c.setAppView()
+
+	// c.appView.SpecificActionView.RefreshActions(specificActions)
+	// c.appView.ActionView.RefreshActions(actions)
+	// c.appView.RemoveSearchView()
+	// c.appView.MainView.Refresh(table)
+	// c.appView.MainView.SetTitle(event.ResourceType)
+	// c.appView.GetApp().SetFocus(c.appView.MainView.GetView())
+	// c.appView.GetApp().Draw()
 }
+
+func (c *CurrentPluginContext) setAppView() {
+
+	rs := c.tableStack[c.currentNestedResourceLevel]
+	table, nestArgs, err := transformer.GetResourceInTableFormat(&rs.currentSchema, rs.currentResources)
+	if err != nil {
+		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
+		return
+	}
+
+	if rs.currentSchema.Nesting.IsNested {
+		rs.nextResourceArgs = nestArgs
+	}
+
+	c.appView.SpecificActionView.RefreshActions(rs.currentSpecficActionList)
+	c.appView.ActionView.RefreshActions(c.currentGenericActions)
+	c.appView.ActionView.EnableNesting(rs.currentSchema.Nesting.IsNested)
+	c.appView.RemoveSearchView()
+	c.appView.MainView.Refresh(table, rs.tableRowNumber)
+	c.appView.MainView.SetTitle(rs.currentResourceType)
+	c.appView.GetApp().SetFocus(c.appView.MainView.GetView())
+	c.appView.GetApp().Draw()
+}
+
+// func (c *CurrentPluginContext) syncNestResource(row int, eventType string) {
+// 	nest := c.nestedResources[c.currentNestedResourceLevel]
+// 	schema, err := c.plugin.GetResourceTypeSchema(nest.currentResourceType)
+// 	if err != nil {
+// 		common.Error(c.logger, fmt.Sprintf("failed to fetch resource type schema: %v", err))
+// 		return
+// 	}
+// 	nest.currentSchema = schema
+
+// 	var resources []interface{}
+// 	if eventType == model.NestBack {
+// 		resources = nest.currentResources
+// 	} else {
+// 		if c.currentNestedResourceLevel > 0 {
+// 			parentNest := c.nestedResources[c.currentNestedResourceLevel-1]
+// 			if parentNest.currentSchema.Nesting.IsSelfContainedInParent {
+// 				parentNest := c.nestedResources[c.currentNestedResourceLevel-1]
+// 				resources, err = transformer.GetSelfContainedResource(&parentNest.currentSchema, parentNest.currentResources[row-1])
+// 				if err != nil {
+// 					common.Error(c.logger, err.Error())
+// 					return
+// 				}
+// 			}
+
+// 		} else {
+// 			// Row will alwyas be greater than 0
+// 			// But array index start 0, And a row == 1 indicates, 0 in the index
+// 			// So we are doing -1
+// 			fnArgs := nest.nextResourceArgs[row-1]
+
+// 			resources, err = c.plugin.GetResources(shared.GetResourcesArgs{ResourceType: nest.currentResourceType, IsolatorID: nest.currentIsolator, Args: fnArgs})
+// 			if err != nil {
+// 				common.Error(c.logger, fmt.Sprintf("failed to fetch resources: %v", err))
+// 				return
+// 			}
+// 		}
+// 		nest.currentResources = resources
+// 	}
+
+// 	if len(resources) == 0 {
+// 		c.appView.SetFlashText("!!! No resources exists ")
+// 	}
+
+// 	c.logger.Debug(fmt.Sprintf("Length of nest resource %v", len(nest.currentResources)))
+// 	table, nestArgs, err := transformer.GetResourceInTableFormat(&nest.currentSchema, nest.currentResources)
+// 	if err != nil {
+// 		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", nest.currentResourceType, err))
+// 		return
+// 	}
+
+// 	specificActions, err := c.plugin.GetSpecficActionList(nest.currentResourceType)
+// 	if err != nil {
+// 		common.Error(c.logger, fmt.Sprintf("unable to get specific actions of resource: %v, %v", nest.currentResourceType, err))
+// 		return
+// 	}
+
+// 	if nest.currentResourceType == c.defaultIsolatorType {
+// 		specificActions = append(specificActions, shared.SpecificAction{Name: "Use", KeyBinding: "u"})
+// 	}
+// 	nest.currentSpecficActionList = specificActions
+
+// 	// nest.currentResourceType = nest.currentResourceType
+
+// 	if nest.currentSchema.Nesting.IsNested {
+// 		c.logger.Debug("Super nesting is enabled", nest.currentSchema.Nesting.ResourceType)
+// 		c.logger.Debug("Data", len(c.nestedResources) >= c.currentNestedResourceLevel, len(c.nestedResources), c.currentNestedResourceLevel)
+// 		// TODO: Fix remvoe entType from this function
+
+// 		if eventType != model.NestBack && len(c.nestedResources) >= c.currentNestedResourceLevel {
+// 			c.logger.Debug("Incremening")
+// 			c.currentNestedResourceLevel++
+// 			c.nestedResources = append(c.nestedResources, &nestedResurce{
+// 				nextResourceArgs:    nestArgs,
+// 				currentResourceType: nest.currentSchema.Nesting.ResourceType,
+// 				currentIsolator:     c.currentIsolator,
+// 			})
+// 		}
+// 	}
+
+// 	c.appView.SpecificActionView.RefreshActions(nest.currentSpecficActionList)
+// 	c.appView.ActionView.RefreshActions(c.currentGenericActions)
+// 	c.appView.ActionView.EnableNesting(nest.currentSchema.Nesting.IsNested)
+// 	c.appView.RemoveSearchView()
+// 	c.appView.MainView.Refresh(table)
+// 	c.appView.MainView.SetTitle(nest.currentResourceType)
+// 	c.appView.GetApp().SetFocus(c.appView.MainView.GetView())
+// 	c.appView.GetApp().Draw()
+// }

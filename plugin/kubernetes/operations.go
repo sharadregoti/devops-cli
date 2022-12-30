@@ -2,16 +2,21 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/shared"
+	"github.com/tidwall/gjson"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -72,16 +77,19 @@ func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.
 	return nil
 }
 
-func (d *Kubernetes) getPodLogs(resourceName, namespace string) (string, error) {
+func (d *Kubernetes) getPodLogs(resourceName, namespace, containerName string) (string, error) {
 	// Set the command to execute
 	command := "kubectl"
 
-	cont, err := d.getContainers(context.Background(), namespace, resourceName)
-	if err != nil {
-		return "", err
+	if containerName == "" {
+		cont, err := d.getContainers(context.Background(), namespace, resourceName)
+		if err != nil {
+			return "", err
+		}
+		containerName = cont
 	}
 
-	arguments := []string{"logs", resourceName, "-n", namespace, "-f", cont}
+	arguments := []string{"logs", resourceName, "-n", namespace, "-f", containerName}
 
 	d.logger.Debug(fmt.Sprintf("Fetching logs for %s %v", command, arguments))
 
@@ -92,7 +100,7 @@ func (d *Kubernetes) getPodLogs(resourceName, namespace string) (string, error) 
 	cc.Stdout = os.Stdout
 
 	if err := cc.Start(); err != nil {
-		d.logger.Error(fmt.Sprintf("failed to get logs, got %v", err))
+		common.Error(d.logger, fmt.Sprintf("failed to get logs, got %v", err))
 		return "", err
 	}
 
@@ -100,7 +108,7 @@ func (d *Kubernetes) getPodLogs(resourceName, namespace string) (string, error) 
 		for range d.activeChans {
 			d.logger.Debug("Closing log resource")
 			if err := cc.Process.Signal(os.Interrupt); err != nil {
-				d.logger.Error(fmt.Sprintf("failed to close log stream, got %v", err))
+				common.Error(d.logger, fmt.Sprintf("failed to close log stream, got %v", err))
 			}
 			return
 		}
@@ -118,7 +126,7 @@ func (d *Kubernetes) DescribeResource(resourceType, resourceName, namespace stri
 	// Execute the command
 	output, err := exec.Command(command, arguments...).Output()
 	if err != nil {
-		d.logger.Error(fmt.Sprintf("failed to get describe output, got %v", err))
+		common.Error(d.logger, fmt.Sprintf("failed to get describe output, got %v", err))
 		return "", err
 	}
 
@@ -154,7 +162,7 @@ func (d *Kubernetes) deleteResource(ctx context.Context, args shared.ActionDelet
 func (d *Kubernetes) getContainers(ctx context.Context, namespace string, resourceName string) (string, error) {
 	pod, err := d.normalClient.CoreV1().Pods(namespace).Get(ctx, resourceName, metav1.GetOptions{})
 	if err != nil {
-		d.logger.Error(fmt.Sprintf("failed to get pod %s in namespace %s, got error %v", resourceName, namespace, err))
+		common.Error(d.logger, fmt.Sprintf("failed to get pod %s in namespace %s, got error %v", resourceName, namespace, err))
 		return "", err
 	}
 
@@ -164,7 +172,65 @@ func (d *Kubernetes) getContainers(ctx context.Context, namespace string, resour
 	return "", nil
 }
 
-func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResourcesArgs) ([]interface{}, error) {
+func (d *Kubernetes) getPods(ctx context.Context, namespace string, resourceName, resourceType string) ([]interface{}, error) {
+	arr, err := d.listResources(ctx, shared.GetResourcesArgs{
+		ResourceName: resourceName,
+		ResourceType: resourceType,
+		IsolatorID:   namespace,
+	}, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(arr) == 0 {
+		common.Error(d.logger, "length of resource is zero")
+		return make([]interface{}, 0), err
+	}
+
+	res := arr[0].(map[string]interface{})
+	strData, err := json.Marshal(res)
+	if err != nil {
+		common.Error(d.logger, fmt.Sprintf("failed to json marshal, got error %v", err))
+		return nil, err
+	}
+
+	path := "spec.selector.matchLabels"
+	if resourceType == "services" {
+		path = "spec.selector"
+	}
+	value := gjson.Get(string(strData), path)
+	if !value.IsObject() {
+		return nil, nil
+	}
+
+	selector := labels.NewSelector()
+	for key, v := range value.Value().(map[string]interface{}) {
+		l2, _ := labels.NewRequirement(key, selection.Equals, []string{v.(string)})
+		selector = selector.Add(*l2)
+	}
+
+	resultArr, err := d.listResources(ctx, shared.GetResourcesArgs{
+		ResourceName: "",
+		ResourceType: "pods",
+		IsolatorID:   namespace,
+	}, selector.String())
+	// list, err := d.normalClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+	// 	LabelSelector: selector.String(),
+	// })
+	if err != nil {
+		common.Error(d.logger, fmt.Sprintf("failed to get pod %s in namespace %s, got error %v", resourceName, namespace, err))
+		return nil, err
+	}
+
+	// resultArr := make([]interface{}, 0)
+	// for _, p := range list.Items {
+	// 	resultArr = append(resultArr, p)
+	// }
+
+	return resultArr, nil
+}
+
+func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResourcesArgs, label string) ([]interface{}, error) {
 	rt, ok := d.resourceTypes[args.ResourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
@@ -180,22 +246,37 @@ func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResources
 	var list *unstructured.UnstructuredList
 	var err error
 
-	if rt.isNamespaced {
-		list, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorID).List(ctx, metav1.ListOptions{})
+	if args.ResourceName != "" {
+		// Single get
+		uData, err := d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorID).Get(ctx, args.ResourceName, metav1.GetOptions{})
+		if err != nil {
+			common.Error(d.logger, fmt.Sprintf("failed to get dynamic resource: %v", err))
+			return nil, err
+		}
+		list = &unstructured.UnstructuredList{Items: []unstructured.Unstructured{*uData}}
 	} else {
-		list, err = d.dynamicClient.Resource(resourceId).List(ctx, metav1.ListOptions{})
-	}
-	if err != nil {
-		return nil, err
+		// List
+		if rt.isNamespaced {
+			list, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorID).List(ctx, metav1.ListOptions{LabelSelector: label})
+		} else {
+			list, err = d.dynamicClient.Resource(resourceId).List(ctx, metav1.ListOptions{LabelSelector: label})
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result := make([]interface{}, 0)
 	for _, item := range list.Items {
-		var rawJson interface{}
+		var rawJson map[string]interface{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &rawJson)
 		if err != nil {
+			common.Error(d.logger, fmt.Sprintf("failed to unstructure resource: %v", err))
 			return nil, err
 		}
+		meta := rawJson["metadata"].(map[string]interface{})
+		delete(meta, "managedFields")
+		rawJson["metadata"] = meta
 		result = append(result, rawJson)
 	}
 

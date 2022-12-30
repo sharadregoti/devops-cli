@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/shared"
 )
 
@@ -37,7 +38,7 @@ func main() {
 
 	pluginK8s, err := New(logger.Named(PluginName))
 	if err != nil {
-		logger.Error(fmt.Sprintf("failed to initialized kubernetes plugin: %v", err))
+		common.Error(logger, fmt.Sprintf("failed to initialized kubernetes plugin: %v", err))
 		// os.Exit(1)
 	}
 
