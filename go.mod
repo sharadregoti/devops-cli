@@ -3,6 +3,7 @@ module github.com/sharadregoti/devops
 go 1.19
 
 require (
+	cloud.google.com/go/firestore v1.9.0
 	github.com/antonmedv/expr v1.9.0
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/fatih/color v1.13.0
@@ -15,6 +16,7 @@ require (
 	github.com/rivo/tview v0.0.0-20221128165837-db36428c92d9
 	github.com/tidwall/gjson v1.14.4
 	golang.org/x/text v0.5.0
+	google.golang.org/api v0.103.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.26.0
 	k8s.io/apimachinery v0.26.0
@@ -26,20 +28,14 @@ require (
 	cloud.google.com/go v0.107.0 // indirect
 	cloud.google.com/go/compute v1.12.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
-	cloud.google.com/go/firestore v1.9.0 // indirect
-	cloud.google.com/go/iam v0.7.0 // indirect
 	cloud.google.com/go/longrunning v0.3.0 // indirect
-	cloud.google.com/go/monitoring v1.9.1 // indirect
-	cloud.google.com/go/storage v1.27.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.103.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
