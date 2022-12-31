@@ -7,7 +7,7 @@ A plugin based TUI to interact with cloud tools & services, intended for devops/
 - Imporved development agility
 
 ## Installation
-Linux
+Linux & Mac
 
 `curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/install.sh | sudo bash`
 
@@ -17,6 +17,7 @@ Linux
 
 ### Kubernetes Features
 - View & search all cluster resources
+- View nested resources. example viewing pods of deployments, services etc...
 - View YAML of specfic resource
 - Describe any resource
 - View logs of pod
