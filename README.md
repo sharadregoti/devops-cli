@@ -6,6 +6,13 @@ A Terminal UI to interact with devops tools & services, intended for devops/plat
 - Improve debugging
 - Imporve development agility
 
+
+## Demo
+
+https://user-images.githubusercontent.com/24411676/210130161-4c467179-9bff-45fd-97e8-0207bb0506c7.mp4
+
+
+
 ## Installation
 Linux & Mac
 
