@@ -9,7 +9,7 @@ A Terminal UI to interact with devops tools & services, intended for devops/plat
 ## Installation
 Linux & Mac
 
-`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/install.sh | sudo bash`
+`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/install.sh | bash`
 
 ## Supported Plugins
 - Kubernetes
