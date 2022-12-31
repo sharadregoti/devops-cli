@@ -1,10 +1,10 @@
 # Devops CLI: A tool to do DevOps in style
 
-A plugin based TUI to interact with cloud tools & services, intended for devops/platform engineers.
+A Terminal UI to interact with devops tools & services, intended for devops/platform engineers.
 
 ## This project aims to achieve the following:
-- Improved debugging
-- Imporved development agility
+- Improve debugging
+- Imporve development agility
 
 ## Installation
 Linux & Mac
@@ -14,6 +14,7 @@ Linux & Mac
 ## Supported Plugins
 - Kubernetes
 - AWS (WIP)
+- Jenkins (WIP)
 
 ### Kubernetes Features
 - View & search all cluster resources
