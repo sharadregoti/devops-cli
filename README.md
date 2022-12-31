@@ -14,7 +14,7 @@ https://user-images.githubusercontent.com/24411676/210130161-4c467179-9bff-45fd-
 
 
 ## Installation
-Linux & Mac
+**Linux & Mac**
 
 `curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/install.sh | bash`
 
