@@ -206,7 +206,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 		c.getCurrentResource().tableRowNumber = event.RowIndex
 	} else if event.Type == model.ReadResource {
 		rs = c.getCurrentResource()
-	} else if event.Type == model.ResourceTypeChanged {
+	} else if event.Type == model.ResourceTypeChanged || event.Type == model.RefreshResource {
 		c.resetToParentResource()
 		rs = &resourceStack{
 			currentResourceType: event.ResourceType,
@@ -229,8 +229,9 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 	var resources []interface{}
 	// TODO: Remove enent type condition from here
-	if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && parent.currentSchema.Nesting.IsSelfContainedInParent {
-		resources, err = transformer.GetSelfContainedResource(&parent.currentSchema, parent.currentResources[event.RowIndex-1])
+	// if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && parent.currentSchema.Nesting.IsSelfContainedInParent {
+	if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && schema.Nesting.IsSelfContainedInParent {
+		resources, err = transformer.GetSelfContainedResource(schema.Nesting.ParentDataPaths, parent.currentResources[event.RowIndex-1])
 		if err != nil {
 			common.Error(c.logger, err.Error())
 			return
@@ -296,9 +297,10 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 func (c *CurrentPluginContext) setAppView() {
 
 	rs := c.tableStack[c.currentNestedResourceLevel]
-	table, nestArgs, err := transformer.GetResourceInTableFormat(&rs.currentSchema, rs.currentResources)
+	table, nestArgs, err := transformer.GetResourceInTableFormat(c.logger, &rs.currentSchema, rs.currentResources)
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
+		c.appView.SetFlashText(err.Error())
 		return
 	}
 

@@ -23,7 +23,7 @@ func (d *Kubernetes) StatusOK() error {
 }
 
 func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, error) {
-
+	
 	label := ""
 	for k, v := range args.Args {
 		if k == "labels" {

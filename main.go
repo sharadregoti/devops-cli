@@ -94,10 +94,10 @@ func Init() {
 		SpecificActionName: "",
 	}
 
-	closerChan := make(chan struct{}, 1)
+	// closerChan := make(chan struct{}, 1)
 	streamCloserChan := make(chan struct{}, 1)
 	defer close(streamCloserChan)
-	defer close(closerChan)
+	// defer close(closerChan)
 	isStreamingOn := false
 	// invokingFirstTime := true
 
@@ -244,6 +244,7 @@ func Init() {
 
 			case model.ShowModal:
 				app.ViewModel(event.ResourceType, event.ResourceName)
+				app.GetApp().Draw()
 
 			// Isolator actions
 			case model.IsolatorChanged:
@@ -275,7 +276,7 @@ func Init() {
 					common.Error(loggerf, fmt.Sprintf("failed to delete resource: %v", err))
 					continue
 				}
-				app.SwitchToMain()
+				// app.SwitchToMain()
 
 			case model.RefreshResource:
 				pCtx.syncResource(event)

@@ -10,11 +10,12 @@ import (
 
 	"github.com/antonmedv/expr"
 	"github.com/gdamore/tcell/v2"
+	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/model"
 	"github.com/tidwall/gjson"
 )
 
-func GetSelfContainedResource(t *model.ResourceTransfomer, resource interface{}) ([]interface{}, error) {
+func GetSelfContainedResource(dataPaths []string, resource interface{}) ([]interface{}, error) {
 	// Extract real data from parent object
 
 	strData, err := json.Marshal(resource)
@@ -23,7 +24,7 @@ func GetSelfContainedResource(t *model.ResourceTransfomer, resource interface{})
 	}
 
 	containedResources := []interface{}{}
-	for _, p := range t.Nesting.ParentDataPaths {
+	for _, p := range dataPaths {
 		value := gjson.Get(string(strData), p)
 		switch v := value.Value().(type) {
 		case []interface{}:
@@ -63,7 +64,7 @@ func GetArgs(resource interface{}, args map[string]interface{}) map[string]inter
 	return nestArgs
 }
 
-func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
+func GetResourceInTableFormat(logger hclog.Logger, t *model.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
 	gjson.AddModifier("age", func(json, arg string) string {
 		return getAge(json[1 : len(json)-1])
 	})
@@ -81,7 +82,7 @@ func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface
 
 	nestArgs := []map[string]interface{}{}
 	for _, resource := range resources {
-		res, nestArg, err := TransformResource(t, resource)
+		res, nestArg, err := TransformResource(logger, t, resource)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -97,7 +98,7 @@ func GetResourceInTableFormat(t *model.ResourceTransfomer, resources []interface
 	return tableResult, nestArgs, nil
 }
 
-func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
+func TransformResource(logger hclog.Logger, t *model.ResourceTransfomer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
 	resultRow := new(model.TableRow)
 	dataRow := make([]string, 0)
 
@@ -146,6 +147,7 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.Ta
 		for _, c := range s.Conditions {
 			// Evaluate the condition
 			// fmt.Println("here")
+			logger.Debug("Is data nil", data)
 			output, err := expr.Eval(c, data)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to evaluate style condition: %v", err)
@@ -160,6 +162,8 @@ func TransformResource(t *model.ResourceTransfomer, data interface{}) (*model.Ta
 				break
 			}
 			switch s.RowBackgroundColor {
+			case "white":
+				resultRow.Color = tcell.ColorWhite
 			case "red":
 				resultRow.Color = tcell.ColorRed
 			case "yellow":

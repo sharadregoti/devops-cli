@@ -80,14 +80,18 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 					ResourceType: strings.ToLower(m.view.GetTitle()),
 				}
 				pa.SwitchToPage(rootPage)
-				c <- model.Event{
-					Type:         model.RefreshResource,
-					RowIndex:     row,
-					ResourceName: m.view.GetCell(row, 1).Text,
-					// This will be NA if resource in not isolator specific
-					IsolatorName: m.view.GetCell(row, 0).Text,
-					ResourceType: strings.ToLower(m.view.GetTitle()),
-				}
+				go func() {
+					// Give time for refresh
+					time.Sleep(1 * time.Second)
+					c <- model.Event{
+						Type:         model.RefreshResource,
+						RowIndex:     row,
+						ResourceName: m.view.GetCell(row, 1).Text,
+						// This will be NA if resource in not isolator specific
+						IsolatorName: m.view.GetCell(row, 0).Text,
+						ResourceType: strings.ToLower(m.view.GetTitle()),
+					}
+				}()
 			}
 			if buttonLabel == "No" {
 				pa.SwitchToPage(rootPage)
@@ -273,9 +277,10 @@ func (a *Application) SetKeyboardShortCuts() {
 
 		case tcell.KeyCtrlR:
 			row, _ := a.MainView.view.GetSelection()
-			if row == 0 {
-				return event
-			}
+			// Refresh can be pressed on row 0 as well
+			// if row == 0 {
+			// 	return event
+			// }
 			a.eventChan <- model.Event{
 				Type:         model.RefreshResource,
 				RowIndex:     row,

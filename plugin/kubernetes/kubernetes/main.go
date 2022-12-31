@@ -24,7 +24,7 @@ var handshakeConfig = plugin.HandshakeConfig{
 }
 
 func main() {
-	common.ConnLoggingInit()
+	go common.ConnLoggingInit()
 
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:       "kubernetes-plugin-server",
