@@ -36,23 +36,28 @@ func NewCommand() *cobra.Command {
 
 			log.Println("Checking for updates...")
 
-			// application code goes here
-			version, err := getLatestVersion()
-			if err != nil {
-				return err
-			}
+			if common.Release {
+				version, err := getLatestVersion()
+				if err != nil {
+					return err
+				}
 
-			if isGreater(version, VERSION) {
-				log.Println("Update available to version:", version)
-				log.Println("Upgrading devops CLI...")
-				if err = runUpgrade(); err != nil {
-					fmt.Println("Updgrade failed: try manual upgration")
-				} else {
-					return nil
+				if isGreater(version, VERSION) {
+					log.Println("Update available to version:", version)
+					log.Println("Upgrading devops CLI...")
+					if err = runUpgrade(); err != nil {
+						fmt.Println("Updgrade failed: try manual upgration")
+					} else {
+						return nil
+					}
 				}
 			}
 
-			go common.IncrementAppStarts()
+			go func() {
+				common.ConnInit()
+				common.IncrementAppStarts()
+			}()
+
 			defer func() {
 				endTime := time.Now()
 

@@ -1,0 +1,1 @@
+# goreleaser release --rm-dist --skip-validate

@@ -1,7 +1,5 @@
 package common
 
-// Sample monitoring-quickstart writes a data point to Stackdriver Monitoring.
-
 import (
 	"context"
 	"fmt"
@@ -12,19 +10,8 @@ import (
 	"cloud.google.com/go/firestore"
 )
 
-// var mClient *monitoring.MetricClient
 var fClient *firestore.Client
 var projectID = "try-out-gcp-features"
-
-// func main() {
-// 	// Set up a connection to the Firestore database.
-// 	ctx := context.Background()
-// 	client, err := firestore.NewClient(ctx, "YOUR-PROJECT-ID")
-// 	if err != nil {
-// 		log.Fatalf("Failed to create client: %v", err)
-// 	}
-// 	defer client.Close()
-// }
 
 func IncrementAppStarts() error {
 	if fClient == nil {
@@ -97,8 +84,8 @@ func getUniqueInfo() map[string]string {
 		return map[string]string{}
 	}
 	return map[string]string{
-		"home": hostname,
-		"host": homeDir,
+		"home": homeDir,
+		"host": hostname,
 	}
 }
 

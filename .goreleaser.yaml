@@ -9,7 +9,7 @@ builds:
     goos:
       - linux
       # - windows
-      # - darwin
+      - darwin
   - id: devops-kubernetes-plugin
     flags:
     - -tags=release  
@@ -18,7 +18,7 @@ builds:
     goos:
       - linux
       # - windows
-      # - darwin
+      - darwin
 release:
   disable: true
   skip_upload: true
@@ -65,3 +65,5 @@ blobs:
     ids:
     - devops-core
     - devops-kubernetes-plugin
+    extra_files:
+    - glob: ./install.sh
