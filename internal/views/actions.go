@@ -25,7 +25,7 @@ func (g *Actions) EnableNesting(v bool) {
 }
 
 func (g *Actions) RefreshActions(data shared.GenericActions) {
-	tempMap := map[string]string{"ctrl-y": "read", "ctrl-r": "refresh", "ctrl-a": "search resources"}
+	tempMap := map[string]string{"ctrl-y": "read", "ctrl-r": "refresh", "ctrl-a": "toggle search bar"}
 	if data.IsCreate {
 		tempMap["ctrl-c"] = "create"
 	}
