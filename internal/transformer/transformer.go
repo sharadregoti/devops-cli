@@ -69,6 +69,10 @@ func GetResourceInTableFormat(logger hclog.Logger, t *model.ResourceTransfomer, 
 		return getAge(json[1 : len(json)-1])
 	})
 
+	gjson.AddModifier("pick", func(json, arg string) string {
+		return getPick(json, arg)
+	})
+
 	tableResult := make([]*model.TableRow, 0)
 
 	headerRow := new(model.TableRow)
@@ -146,9 +150,13 @@ func TransformResource(logger hclog.Logger, t *model.ResourceTransfomer, data in
 	for _, s := range t.Styles {
 		for _, c := range s.Conditions {
 			// Evaluate the condition
-			// fmt.Println("here")
-			logger.Debug("Is data nil", data)
-			output, err := expr.Eval(c, data)
+			program, err := expr.Compile(c, expr.Env(data))
+			if err != nil {
+				logger.Debug("skipping style condition as failed to compile style condition", err)
+				continue
+			}
+
+			output, err := expr.Run(program, data)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to evaluate style condition: %v", err)
 			}
@@ -220,4 +228,25 @@ func getAge(ts string) string {
 	}
 
 	return fmt.Sprintf(`"%s"`, result)
+}
+
+func getPick(ts string, args string) string {
+	result := []string{}
+
+	var temp []map[string]interface{}
+	_ = json.Unmarshal([]byte(ts), &temp)
+
+	for _, myMap := range temp {
+		port := []string{}
+		for _, field := range strings.Split(args, ",") {
+			rs, ok := myMap[field]
+			if !ok || rs == "" {
+				continue
+			}
+			port = append(port, fmt.Sprintf("%v", rs))
+		}
+		result = append(result, strings.Join(port, "->"))
+	}
+
+	return fmt.Sprintf(`"%s"`, strings.Join(result, " "))
 }

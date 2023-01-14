@@ -34,7 +34,6 @@ func valiations() {
 	// fmt.Println(consolescanner.Text())
 
 	obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(f, nil, nil)
-
 	if err != nil {
 		log.Fatalf(fmt.Sprintf("Error while decoding YAML object. Err was: %s", err))
 		return
