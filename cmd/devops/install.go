@@ -111,7 +111,6 @@ downloadFile() {
     LATEST_RELEASE_TAG=$1
 
     SPACE_CLI_ARTIFACT="devops_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
-    # https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/devops_0.1.0_Linux_arm64.tar.gz
     DOWNLOAD_BASE="https://storage.googleapis.com/devops-cli-artifacts/releases/devops/${LATEST_RELEASE_TAG}"
     DOWNLOAD_URL="${DOWNLOAD_BASE}/${SPACE_CLI_ARTIFACT}"
 
@@ -171,6 +170,8 @@ installFile() {
     fi
 
     chmod o+x $tmp_root_space_cli
+    echo "Removing old installation"
+    runAsRoot rm "$SPACE_CLI_INSTALL_DIR/devops"
     runAsRoot cp "$tmp_root_space_cli" "$SPACE_CLI_INSTALL_DIR"
 
     if [ -f "$SPACE_CLI_FILE" ]; then

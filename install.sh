@@ -162,6 +162,8 @@ installFile() {
     fi
 
     chmod o+x $tmp_root_space_cli
+    echo "Removing old installation"
+    runAsRoot rm "$SPACE_CLI_INSTALL_DIR/devops"
     runAsRoot cp "$tmp_root_space_cli" "$SPACE_CLI_INSTALL_DIR"
 
     if [ -f "$SPACE_CLI_FILE" ]; then
