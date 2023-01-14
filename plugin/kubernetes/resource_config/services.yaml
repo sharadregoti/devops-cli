@@ -21,7 +21,7 @@ operations:
     output_format: ""
   - name: "ports"
     json_paths: 
-    - path: "spec.ports|@flatten|@pick:name,nodePort,port"
+    - path: "spec.ports|@flatten|@pick:name,nodePort,port,targetPort"
     output_format: ""
   - name: "age"
     json_paths: 
