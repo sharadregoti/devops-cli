@@ -103,6 +103,19 @@ func Init() {
 
 	// nestedResourceLevel := -1
 
+	// go func() {
+	// 	http.HandleFunc("/data", pCtx.handle)
+
+	// 	// Enable CORS for all routes
+	// 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// 		w.Header().Set("Access-Control-Allow-Origin", "*")
+	// 		w.Header().Set("Access-Control-Allow-Methods", "*")
+	// 		w.Header().Set("Access-Control-Allow-Headers", "*")
+	// 	}))
+
+	// 	http.ListenAndServe(":9000", nil)
+	// }()
+
 	go func() {
 		for event := range eventChan {
 			loggerf.Debug("\n")
@@ -154,6 +167,7 @@ func Init() {
 					_, err := kp.PerformSpecificAction(fnArgs)
 					if err != nil {
 						common.Error(loggerf, fmt.Sprintf("failed to perform close action on resource: %v", err))
+						app.SetFlashText(err.Error())
 						continue
 					}
 					streamCloserChan <- struct{}{}
@@ -272,7 +286,7 @@ func Init() {
 				app.GetApp().Draw()
 
 			case model.DeleteResource:
-				if err := kp.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: event.ResourceName, ResourceType: event.ResourceType, IsolatorName: event.IsolatorName}); err != nil {
+				if err := kp.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: event.ResourceName, ResourceType: pCtx.getCurrentResource().currentResourceType, IsolatorName: pCtx.currentIsolator}); err != nil {
 					common.Error(loggerf, fmt.Sprintf("failed to delete resource: %v", err))
 					continue
 				}

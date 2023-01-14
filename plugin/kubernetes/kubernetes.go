@@ -122,7 +122,13 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 				version = arr[1]
 			}
 
-			resourceTypeMap[r.Name] = &resourceTypeInfo{
+			// This is because if you use r.name, it has conflicting values pods for 2 different groups (which overwirte each other)
+			name := strings.ToLower(r.Kind)
+			if !strings.HasSuffix(name, "s") {
+				name = name + "s"
+			}
+
+			resourceTypeMap[name] = &resourceTypeInfo{
 				group:            group,
 				version:          version,
 				resourceTypeName: r.Name,

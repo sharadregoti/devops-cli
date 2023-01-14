@@ -2,9 +2,11 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
+	"github.com/ghodss/yaml"
 	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
@@ -23,7 +25,7 @@ func (d *Kubernetes) StatusOK() error {
 }
 
 func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, error) {
-	
+
 	label := ""
 	for k, v := range args.Args {
 		if k == "labels" {
@@ -189,6 +191,27 @@ func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shar
 			OutputType: "string",
 		}, nil
 
+	case "decode-secret":
+		items, err := d.GetResources(shared.GetResourcesArgs{
+			ResourceName: args.ResourceName,
+			ResourceType: args.ResourceType,
+			IsolatorID:   args.IsolatorName,
+		})
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+
+		result, err := d.decodeSecret(items[0])
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+
+		return shared.SpecificActionResult{
+			Result: result,
+			// TODO: Output type should come from an core SDK
+			OutputType: "string",
+		}, nil
+
 	case "logs":
 
 		containerName := ""
@@ -225,4 +248,47 @@ func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shar
 	}
 
 	return shared.SpecificActionResult{}, nil
+}
+
+func (d *Kubernetes) decodeSecret(rawData interface{}) (string, error) {
+
+	secretData := rawData.(map[string]interface{})["data"].(map[string]interface{})
+
+	// data, err := json.Marshal(rawData)
+	// if err != nil {
+	// 	return err.Error()
+	// }
+
+	// obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(data, nil, nil)
+	// if err != nil {
+	// 	log.Fatalf(fmt.Sprintf("Error while decoding YAML object. Err was: %s", err))
+	// 	return "", fmt.Errorf("")
+	// }
+
+	// switch o := obj.(type) {
+	// case *v1.ConfigMap:
+
+	// case *v1.Secret:
+	// default:
+	// 	fmt.Printf("Type %v is unknown", o)
+	// }
+
+	decodedMap := map[string]string{}
+	for key, encodedData := range secretData {
+		decodedData, err := base64.StdEncoding.DecodeString(string(encodedData.(string)))
+		if err != nil {
+			common.Error(d.logger, fmt.Sprintf("failed to decode base64 string: %v", err))
+			return "", err
+		}
+		decodedMap[key] = string(decodedData)
+	}
+
+	rawData.(map[string]interface{})["data"] = decodedMap
+	finalData, err := yaml.Marshal(rawData)
+	if err != nil {
+		common.Error(d.logger, fmt.Sprintf("failed to yaml marshal decode secret: %v", err))
+		return "", err
+	}
+
+	return string(finalData), nil
 }

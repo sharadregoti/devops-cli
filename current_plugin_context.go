@@ -1,7 +1,10 @@
 package core
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	hclog "github.com/hashicorp/go-hclog"
@@ -10,6 +13,7 @@ import (
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
+	"github.com/sharadregoti/devops/utils"
 )
 
 // Node represents a node of linked list
@@ -231,15 +235,18 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	// TODO: Remove enent type condition from here
 	// if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && parent.currentSchema.Nesting.IsSelfContainedInParent {
 	if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && schema.Nesting.IsSelfContainedInParent {
+		c.logger.Debug("Getting nested resource from parent")
 		resources, err = transformer.GetSelfContainedResource(schema.Nesting.ParentDataPaths, parent.currentResources[event.RowIndex-1])
 		if err != nil {
 			common.Error(c.logger, err.Error())
+			c.appView.SetFlashText(err.Error())
 			return
 		}
 	} else {
 		resources, err = c.plugin.GetResources(shared.GetResourcesArgs{ResourceType: rs.currentResourceType, IsolatorID: c.currentIsolator, Args: fnArgs})
 		if err != nil {
 			common.Error(c.logger, fmt.Sprintf("failed to fetch resources: %v", err))
+			c.appView.SetFlashText(err.Error())
 			return
 		}
 	}
@@ -257,6 +264,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	actions, err := c.plugin.GetSupportedActions(rs.currentResourceType)
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to get supported actions of resource: %v, %v", rs.currentResourceType, err))
+		c.appView.SetFlashText(err.Error())
 		return
 	}
 	c.currentGenericActions = actions
@@ -264,6 +272,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	specificActions, err := c.plugin.GetSpecficActionList(rs.currentResourceType)
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to get specific actions of resource: %v, %v", rs.currentResourceType, err))
+		c.appView.SetFlashText(err.Error())
 		return
 	}
 
@@ -294,6 +303,39 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	// c.appView.GetApp().Draw()
 }
 
+func (c *CurrentPluginContext) handle(w http.ResponseWriter, req *http.Request) {
+	rs := c.tableStack[c.currentNestedResourceLevel]
+	table, _, err := transformer.GetResourceInTableFormat(c.logger, &rs.currentSchema, rs.currentResources)
+	if err != nil {
+		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
+		c.appView.SetFlashText(err.Error())
+		return
+	}
+	temp := map[string]interface{}{
+		"specificActions": c.getCurrentResource().currentSpecficActionList,
+		"resources": map[string]interface{}{
+			"headers": table[0],
+			"columns": table[1:],
+		},
+		"schema":       c.getCurrentResource().currentSchema,
+		"resourceType": c.getCurrentResource().currentResourceType,
+	}
+	// currentResourceType      string
+	// currentResources         []interface{}
+	// currentSchema            model.ResourceTransfomer
+
+	SendResponse(context.Background(), w, 200, temp)
+}
+
+// SendResponse sends an http response
+func SendResponse(ctx context.Context, w http.ResponseWriter, statusCode int, body interface{}) error {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	return json.NewEncoder(w).Encode(body)
+}
+
 func (c *CurrentPluginContext) setAppView() {
 
 	rs := c.tableStack[c.currentNestedResourceLevel]
@@ -313,7 +355,7 @@ func (c *CurrentPluginContext) setAppView() {
 	c.appView.ActionView.EnableNesting(rs.currentSchema.Nesting.IsNested)
 	c.appView.RemoveSearchView()
 	c.appView.MainView.Refresh(table, rs.tableRowNumber)
-	c.appView.MainView.SetTitle(rs.currentResourceType)
+	c.appView.MainView.SetTitle(utils.GetTableTitle(rs.currentResourceType, len(rs.currentResources)))
 	c.appView.GetApp().SetFocus(c.appView.MainView.GetView())
 	c.appView.GetApp().Draw()
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/rivo/tview"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/utils"
 )
 
 const (
@@ -71,13 +72,14 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonLabel == "Yes" {
 				row, _ := m.view.GetSelection()
+				resourceType, _ := utils.ParseTableTitle(m.view.GetTitle())
 				c <- model.Event{
 					Type:         model.DeleteResource,
 					RowIndex:     row,
 					ResourceName: m.view.GetCell(row, 1).Text,
 					// This will be NA if resource in not isolator specific
 					IsolatorName: m.view.GetCell(row, 0).Text,
-					ResourceType: strings.ToLower(m.view.GetTitle()),
+					ResourceType: strings.ToLower(resourceType),
 				}
 				pa.SwitchToPage(rootPage)
 				go func() {
@@ -89,7 +91,7 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 						ResourceName: m.view.GetCell(row, 1).Text,
 						// This will be NA if resource in not isolator specific
 						IsolatorName: m.view.GetCell(row, 0).Text,
-						ResourceType: strings.ToLower(m.view.GetTitle()),
+						ResourceType: strings.ToLower(resourceType),
 					}
 				}()
 			}
@@ -240,12 +242,13 @@ func (a *Application) SetKeyboardShortCuts() {
 				if row == 0 {
 					return event
 				}
+				resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
 				a.eventChan <- model.Event{
 					Type: model.AddIsolator,
 					// +1 because "name" is always the second column that indicates the isolator name
 					// TODO: In future, change it to dynamically detected isolator name from table content irrespecitve of where the column
 					IsolatorName: a.MainView.view.GetCell(row, 1).Text,
-					ResourceType: strings.ToLower(a.MainView.view.GetTitle()),
+					ResourceType: strings.ToLower(resourceType),
 				}
 				return event
 			}
@@ -281,11 +284,12 @@ func (a *Application) SetKeyboardShortCuts() {
 			// if row == 0 {
 			// 	return event
 			// }
+			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
 			a.eventChan <- model.Event{
 				Type:         model.RefreshResource,
 				RowIndex:     row,
 				ResourceName: a.MainView.view.GetCell(row, 1).Text,
-				ResourceType: strings.ToLower(a.MainView.view.GetTitle()),
+				ResourceType: strings.ToLower(resourceType),
 				// This will be NA if resource in not isolator specific
 				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
 			}
@@ -296,11 +300,12 @@ func (a *Application) SetKeyboardShortCuts() {
 				// Remove header row
 				return event
 			}
+			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
 			a.eventChan <- model.Event{
 				Type:         model.ReadResource,
 				RowIndex:     row,
 				ResourceName: a.MainView.view.GetCell(row, 1).Text,
-				ResourceType: strings.ToLower(a.MainView.view.GetTitle()),
+				ResourceType: strings.ToLower(resourceType),
 				// This will be NA if resource in not isolator specific
 				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
 			}
@@ -310,11 +315,12 @@ func (a *Application) SetKeyboardShortCuts() {
 			if row == 0 {
 				return event
 			}
+			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
 			a.eventChan <- model.Event{
 				Type:         model.ShowModal,
 				RowIndex:     row,
 				ResourceName: a.MainView.view.GetCell(row, 1).Text,
-				ResourceType: strings.ToLower(a.MainView.view.GetTitle()),
+				ResourceType: strings.ToLower(resourceType),
 				// This will be NA if resource in not isolator specific
 				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
 			}
@@ -342,7 +348,7 @@ func (a *Application) RemoveSearchView() {
 }
 
 func (a *Application) Start() error {
-	return a.application.EnableMouse(true).Run()
+	return a.application.EnableMouse(false).Run()
 }
 
 func (a *Application) SetFlashText(text string) {

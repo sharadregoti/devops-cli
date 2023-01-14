@@ -7,9 +7,21 @@ operations:
     json_paths: 
     - path: "metadata.name"
     output_format: ""
-  - name: "status"
+  - name: "type"
     json_paths: 
-    - path: "status.phase"
+    - path: "spec.type"
+    output_format: ""
+  - name: "cluster-ip"
+    json_paths: 
+    - path: "spec.clusterIPs"
+    output_format: ""
+  - name: "external-ip"
+    json_paths: 
+    - path: "status.loadBalancer.ingress"
+    output_format: ""
+  - name: "ports"
+    json_paths: 
+    - path: "spec.ports|@flatten|@pick:name,nodePort,port"
     output_format: ""
   - name: "age"
     json_paths: 
