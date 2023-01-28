@@ -20,7 +20,9 @@ func (d *Kubernetes) Name() string {
 
 // TODO: test & fix this
 func (d *Kubernetes) StatusOK() error {
-	common.Error(d.logger, fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
+	if d.isOK != nil {
+		common.Error(d.logger, fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
+	}
 	return d.isOK
 }
 
@@ -222,15 +224,48 @@ func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shar
 			args.ResourceName = parentName.(string)
 		}
 
-		_, err := d.getPodLogs(args.ResourceName, args.IsolatorName, containerName)
+		res, err := d.getPodLogs(args.ResourceName, args.IsolatorName, containerName)
 		if err != nil {
 			return shared.SpecificActionResult{}, err
 		}
 
 		return shared.SpecificActionResult{
-			Result:     "",
+			Result:     res,
 			OutputType: "string",
 		}, nil
+
+	case "shell":
+
+		containerName := ""
+		if args.ResourceType == "containers" {
+			parentName := args.Args["parentName"]
+			args.ResourceType = "pods"
+			containerName = args.ResourceName
+			args.ResourceName = parentName.(string)
+		}
+
+		res, err := d.execPod(args.ResourceName, args.IsolatorName, containerName)
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+
+		return shared.SpecificActionResult{
+			Result:     res,
+			OutputType: "string",
+		}, nil
+
+	case "port-forward":
+
+		res, err := d.portForward(args.ResourceName, args.IsolatorName, args.Args)
+		if err != nil {
+			return shared.SpecificActionResult{}, err
+		}
+
+		return shared.SpecificActionResult{
+			Result:     res,
+			OutputType: "string",
+		}, nil
+
 	case "view-pods":
 		res, err := d.getPods(context.Background(), args.IsolatorName, args.ResourceName, args.ResourceType)
 		if err != nil {

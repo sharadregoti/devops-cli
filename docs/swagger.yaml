@@ -1,0 +1,114 @@
+definitions:
+  model.Action:
+    properties:
+      key_binding:
+        type: string
+      name:
+        description: Name is the name to be shown on UI
+        type: string
+      output_type:
+        description: Output type can be
+        type: string
+      schema:
+        additionalProperties: true
+        type: object
+      type:
+        description: Type can be one of normal, special, internal
+        type: string
+    type: object
+  model.ErrorResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  model.EventResponse:
+    properties:
+      id:
+        type: string
+      result: {}
+    type: object
+  model.Info:
+    properties:
+      actions:
+        items:
+          $ref: '#/definitions/model.Action'
+        type: array
+      defaultIsolator:
+        type: string
+      general:
+        additionalProperties:
+          type: string
+        type: object
+      id:
+        type: string
+      isolatorType:
+        type: string
+      plugins:
+        additionalProperties:
+          type: string
+        type: object
+      resourceTypes:
+        items:
+          type: string
+        type: array
+    type: object
+host: localhost:4949
+info:
+  contact: {}
+  description: Devops API Sec
+  title: NEW Devops API
+  version: v0.1.0
+paths:
+  /v1/events/{id}:
+    post:
+      consumes:
+      - application/json
+      description: HandleEvent endpoint
+      operationId: HandleEvent
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.EventResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: HandleEvent endpoint
+  /v1/info:
+    get:
+      consumes:
+      - application/json
+      description: HandleInfo endpoint
+      operationId: HandleInfo
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Info'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: HandleInfo endpoint
+swagger: "2.0"

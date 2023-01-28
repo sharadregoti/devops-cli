@@ -2,12 +2,12 @@ package views
 
 import (
 	"github.com/rivo/tview"
-	"github.com/sharadregoti/devops/shared"
+	"github.com/sharadregoti/devops/model"
 )
 
 type SpecificActions struct {
 	view    *tview.TextView
-	actions []shared.SpecificAction
+	actions []*model.Action
 }
 
 func NewSpecificAction() *SpecificActions {
@@ -24,7 +24,7 @@ func (g *SpecificActions) GetView() *tview.TextView {
 	return g.view
 }
 
-func (g *SpecificActions) RefreshActions(data []shared.SpecificAction) {
+func (g *SpecificActions) RefreshActions(data []*model.Action) {
 	temp := map[string]string{}
 	for _, sa := range data {
 		temp[sa.KeyBinding] = sa.Name

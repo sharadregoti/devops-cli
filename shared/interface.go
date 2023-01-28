@@ -2,6 +2,10 @@ package shared
 
 import "github.com/sharadregoti/devops/model"
 
+type DevopsHelper interface {
+	SendData(data interface{}) error
+}
+
 type Devops interface {
 	Name() string
 	StatusOK() error

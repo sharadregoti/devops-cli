@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/hashicorp/go-hclog"
+	"github.com/ghodss/yaml"
 	"github.com/rivo/tview"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils"
+	"github.com/sharadregoti/devops/utils/logger"
 )
 
 const (
@@ -26,28 +27,35 @@ type Application struct {
 	IsolatorView       *IsolatorView
 	PluginView         *PluginView
 	FlashView          *FlashView
-	eventChan          chan model.Event
 	application        *tview.Application
 	page               *tview.Pages
 	Ta                 *tview.TextView
 	SpecificActionView *SpecificActions
 	ActionView         *Actions
 	modal              *tview.Modal
-	logger             hclog.Logger
+	addr               string
+
+	connectionID string
+
+	// Communication Channel
+	wsdata chan model.WebsocketResponse
+
+	// Application state
+	currentIsolator string
 }
 
-func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
-
+func NewApplication(addr string) (*Application, error) {
+	// c := make(chan model.Event, 1)
 	pa := tview.NewPages()
 
-	i := NewIsolatorView(logger, c)
+	i := NewIsolatorView()
 	m := NewMainView()
-	s := NewSearchView(c)
+	s := NewSearchView() // Need chan
 	g := NewGeneralInfo()
 	p := NewPluginView()
 	act := NewAction()
 	sa := NewSpecificAction()
-	flash := NewFlashView(logger, c)
+	flash := NewFlashView()
 
 	// Global page info flex view
 	global := tview.NewFlex().
@@ -64,6 +72,24 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 		AddItem(m.GetView(), 0, 1, true).
 		AddItem(s.GetView(), 0, 0, false) // Default disable
 
+	r := &Application{
+		rootView:           rootFlexContainer,
+		MainView:           m,
+		GeneralInfoView:    g,
+		SearchView:         s,
+		IsolatorView:       i,
+		PluginView:         p,
+		SpecificActionView: sa,
+		// application:        a,
+		page: pa,
+		// Ta:                 ta,
+		ActionView: act,
+		FlashView:  flash,
+		// modal:      modal,
+		addr: addr,
+		// wsdata:     wsdata,
+	}
+
 	// Model page
 	// TODO: Preselect no button
 	modal := tview.NewModal().
@@ -73,27 +99,44 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 			if buttonLabel == "Yes" {
 				row, _ := m.view.GetSelection()
 				resourceType, _ := utils.ParseTableTitle(m.view.GetTitle())
-				c <- model.Event{
-					Type:         model.DeleteResource,
-					RowIndex:     row,
+
+				_, err := r.sendEvent(model.FrontendEvent{
+					EventType:    model.NormalAction,
+					ActionName:   string(model.DeleteResource),
 					ResourceName: m.view.GetCell(row, 1).Text,
-					// This will be NA if resource in not isolator specific
-					IsolatorName: m.view.GetCell(row, 0).Text,
 					ResourceType: strings.ToLower(resourceType),
+					IsolatorName: m.view.GetCell(row, 0).Text,
+				})
+				if err != nil {
+					return
 				}
+				// c <- model.Event{
+				// 	Type:         model.DeleteResource,
+				// 	RowIndex:     row,
+				// 	ResourceName: m.view.GetCell(row, 1).Text,
+				// 	// This will be NA if resource in not isolator specific
+				// 	IsolatorName: m.view.GetCell(row, 0).Text,
+				// 	ResourceType: strings.ToLower(resourceType),
+				// }
 				pa.SwitchToPage(rootPage)
-				go func() {
-					// Give time for refresh
-					time.Sleep(1 * time.Second)
-					c <- model.Event{
-						Type:         model.RefreshResource,
-						RowIndex:     row,
-						ResourceName: m.view.GetCell(row, 1).Text,
-						// This will be NA if resource in not isolator specific
-						IsolatorName: m.view.GetCell(row, 0).Text,
-						ResourceType: strings.ToLower(resourceType),
-					}
-				}()
+				// a.SwitchToMainc()
+				// go func() {
+				// Give time for refresh
+				// time.Sleep(1 * time.Second)
+				// r.sendEvent(model.FrontendEvent{
+				// EventType:  model.InternalAction,
+				// ActionName: string(model.RefreshResource),
+				// RowIndex:   row,
+				// })
+				// c <- model.Event{
+				// 	Type:         string(model.RefreshResource),
+				// 	RowIndex:     row,
+				// 	ResourceName: m.view.GetCell(row, 1).Text,
+				// 	// This will be NA if resource in not isolator specific
+				// 	IsolatorName: m.view.GetCell(row, 0).Text,
+				// 	ResourceType: strings.ToLower(resourceType),
+				// }
+				// }()
 			}
 			if buttonLabel == "No" {
 				pa.SwitchToPage(rootPage)
@@ -111,15 +154,38 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 
 	ta.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEscape {
-			c <- model.Event{
-				Type: model.Close,
-			}
-			logger.Debug("Sending close event chan")
+			r.sendEvent(model.FrontendEvent{
+				EventType:  model.InternalAction,
+				ActionName: string(model.Close),
+				// RowIndex:   row,
+			})
+			// c <- model.Event{
+			// 	Type: model.Close,
+			// }
+			logger.LogDebug("Sending close event chan")
 			pa.SwitchToPage(rootPage)
 		}
 	})
 
+	wsdata := make(chan model.WebsocketResponse, 1)
+	go func() {
+		for v := range wsdata {
+			r.SpecificActionView.RefreshActions(v.SpecificActions)
+			// c.appView.ActionView.EnableNesting(rs.currentSchema.Nesting.IsNested)
+			r.MainView.SetTitle(v.TableName)
+			r.RemoveSearchView()
+			r.MainView.Refresh(v.Data, 0)
+			r.GetApp().SetFocus(r.MainView.GetView())
+			r.GetApp().Draw()
+			logger.LogDebug("Websocket: received data from server, total length (%v)", len(v.Data))
+		}
+	}()
+
 	a := tview.NewApplication().SetRoot(pa, true)
+	r.application = a
+	r.Ta = ta
+	r.modal = modal
+	r.wsdata = wsdata
 
 	// This is here because during the search we if we press any rune key that corresponding function get triggered
 	m.view.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -128,11 +194,11 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 			if row == 0 {
 				return nil
 			}
-			c <- model.Event{
-				Type:         model.ViewNestedResource,
-				RowIndex:     row,
-				ResourceName: m.view.GetCell(row, 1).Text,
-			}
+			// c <- model.Event{
+			// 	Type:         string(model.ViewNestedResource),
+			// 	RowIndex:     row,
+			// 	ResourceName: m.view.GetCell(row, 1).Text,
+			// }
 			return event
 		}
 		if event.Key() == tcell.KeyRune {
@@ -145,11 +211,30 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 				// TODO: Validate key bindings
 				stringToRune := action.KeyBinding[0]
 				if event.Rune() == rune(stringToRune) {
-					c <- model.Event{
-						Type:               model.SpecificActionOccured,
-						SpecificActionName: action.Name,
-						ResourceName:       m.view.GetCell(row, 1).Text,
+					resourceType, _ := utils.ParseTableTitle(m.view.GetTitle())
+					res, err := r.sendEvent(model.FrontendEvent{
+						EventType:    model.SpecificAction,
+						ActionName:   action.Name,
+						ResourceType: resourceType,
+						ResourceName: m.view.GetCell(row, 1).Text,
+						IsolatorName: m.view.GetCell(row, 0).Text,
+					})
+					if err != nil {
+						return event
 					}
+
+					if action.OutputType == model.OutputTypeString {
+						stringData := res.Result.(string)
+						go func() {
+							r.SetTextAndSwitchView(stringData)
+							r.GetApp().Draw()
+						}()
+					}
+					// c <- model.Event{
+					// 	Type:               string(model.SpecificActionOccured),
+					// 	SpecificActionName: action.Name,
+					// 	ResourceName:       m.view.GetCell(row, 1).Text,
+					// }
 					return event
 				}
 			}
@@ -157,27 +242,36 @@ func NewApplication(logger hclog.Logger, c chan model.Event) *Application {
 		return event
 	})
 
-	r := &Application{
-		rootView:           rootFlexContainer,
-		MainView:           m,
-		GeneralInfoView:    g,
-		SearchView:         s,
-		IsolatorView:       i,
-		PluginView:         p,
-		SpecificActionView: sa,
-		eventChan:          c,
-		application:        a,
-		page:               pa,
-		Ta:                 ta,
-		ActionView:         act,
-		logger:             logger,
-		FlashView:          flash,
-		modal:              modal,
-	}
-
 	r.SetKeyboardShortCuts()
 
-	return r
+	infoRes, err := r.getInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.websocket(infoRes.SessionID, wsdata); err != nil {
+		return nil, err
+	}
+
+	r.connectionID = infoRes.SessionID
+	r.ActionView.RefreshActions(infoRes.Actions)
+	r.SearchView.SetResourceTypes(infoRes.ResourceTypes)
+	r.GeneralInfoView.Refresh(infoRes.General)
+	r.IsolatorView.SetDefault(infoRes.DefaultIsolator)
+	r.currentIsolator = infoRes.DefaultIsolator
+	r.IsolatorView.SetTitle(strings.Title(infoRes.IsolatorType))
+
+	r.SearchView.GetView().Autocomplete().SetDoneFunc(func(key tcell.Key) {
+		r.sendEvent(model.FrontendEvent{
+			EventType:    model.InternalAction,
+			ActionName:   string(model.ResourceTypeChanged),
+			ResourceType: r.SearchView.GetView().GetText(),
+			ResourceName: "",
+			IsolatorName: r.currentIsolator,
+		})
+		r.SearchView.GetView().SetText("")
+	})
+	return r, nil
 }
 
 func (a *Application) SetTextAndSwitchView(text string) {
@@ -214,14 +308,14 @@ func (a *Application) SetKeyboardShortCuts() {
 		// 	}
 		// }
 		if event.Key() == tcell.KeyEscape {
-			row, _ := a.MainView.view.GetSelection()
+			// row, _ := a.MainView.view.GetSelection()
 			// if row == 0 {
 			// 	return event
 			// }
-			a.eventChan <- model.Event{
-				Type:     model.NestBack,
-				RowIndex: row,
-			}
+			// a.eventChan <- model.Event{
+			// 	Type:     model.NestBack,
+			// 	RowIndex: row,
+			// }
 			return event
 		}
 
@@ -237,19 +331,30 @@ func (a *Application) SetKeyboardShortCuts() {
 		// 	}
 
 		case tcell.KeyRune:
+			row, _ := a.MainView.view.GetSelection()
 			if event.Rune() == 'u' {
-				row, _ := a.MainView.view.GetSelection()
 				if row == 0 {
 					return event
 				}
-				resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
-				a.eventChan <- model.Event{
-					Type: model.AddIsolator,
-					// +1 because "name" is always the second column that indicates the isolator name
-					// TODO: In future, change it to dynamically detected isolator name from table content irrespecitve of where the column
-					IsolatorName: a.MainView.view.GetCell(row, 1).Text,
-					ResourceType: strings.ToLower(resourceType),
-				}
+				go func() {
+					// pCtx.clearNestedResource()
+					a.IsolatorView.AddAndRefreshView(a.MainView.view.GetCell(row, 1).Text)
+					a.GetApp().Draw()
+				}()
+
+				// resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
+				// a.sendEvent(model.FrontendEvent{
+				// EventType:  model.SpecificAction,
+				// ActionName: string(model.AddIsolator),
+				// RowIndex:   row,
+				// })
+				// a.eventChan <- model.Event{
+				// 	Type: string(model.AddIsolator),
+				// 	// +1 because "name" is always the second column that indicates the isolator name
+				// 	// TODO: In future, change it to dynamically detected isolator name from table content irrespecitve of where the column
+				// 	IsolatorName: a.MainView.view.GetCell(row, 1).Text,
+				// 	ResourceType: strings.ToLower(resourceType),
+				// }
 				return event
 			}
 
@@ -257,10 +362,23 @@ func (a *Application) SetKeyboardShortCuts() {
 			for i := range a.IsolatorView.currentKeyMap {
 				numToRune := fmt.Sprintf("%d", i)[0]
 				if event.Rune() == rune(numToRune) {
-					a.eventChan <- model.Event{
-						Type:         model.IsolatorChanged,
+					resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
+
+					_, err := a.sendEvent(model.FrontendEvent{
+						EventType:    model.NormalAction,
+						ActionName:   string(model.IsolatorChanged),
+						ResourceName: a.MainView.view.GetCell(row, 1).Text,
+						ResourceType: strings.ToLower(resourceType),
 						IsolatorName: a.IsolatorView.currentKeyMap[i],
+					})
+					if err != nil {
+						return event
 					}
+					a.currentIsolator = a.IsolatorView.currentKeyMap[i]
+					// a.eventChan <- model.Event{
+					// 	Type:         string(model.IsolatorChanged),
+					// 	IsolatorName: a.IsolatorView.currentKeyMap[i],
+					// }
 				}
 			}
 
@@ -280,19 +398,25 @@ func (a *Application) SetKeyboardShortCuts() {
 
 		case tcell.KeyCtrlR:
 			row, _ := a.MainView.view.GetSelection()
-			// Refresh can be pressed on row 0 as well
-			// if row == 0 {
-			// 	return event
-			// }
 			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
-			a.eventChan <- model.Event{
-				Type:         model.RefreshResource,
-				RowIndex:     row,
+			_, err := a.sendEvent(model.FrontendEvent{
+				EventType:    model.InternalAction,
+				ActionName:   string(model.RefreshResource),
 				ResourceName: a.MainView.view.GetCell(row, 1).Text,
 				ResourceType: strings.ToLower(resourceType),
-				// This will be NA if resource in not isolator specific
 				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+			})
+			if err != nil {
+				return nil
 			}
+			// a.eventChan <- model.Event{
+			// 	Type:         string(model.RefreshResource),
+			// 	RowIndex:     row,
+			// 	ResourceName: a.MainView.view.GetCell(row, 1).Text,
+			// 	ResourceType: strings.ToLower(resourceType),
+			// 	// This will be NA if resource in not isolator specific
+			// 	IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+			// }
 
 		case tcell.KeyCtrlY:
 			row, _ := a.MainView.view.GetSelection()
@@ -301,14 +425,30 @@ func (a *Application) SetKeyboardShortCuts() {
 				return event
 			}
 			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
-			a.eventChan <- model.Event{
-				Type:         model.ReadResource,
-				RowIndex:     row,
+			res, err := a.sendEvent(model.FrontendEvent{
+				EventType:    model.NormalAction,
+				ActionName:   string(model.ReadResource),
 				ResourceName: a.MainView.view.GetCell(row, 1).Text,
 				ResourceType: strings.ToLower(resourceType),
-				// This will be NA if resource in not isolator specific
 				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+			})
+			if err != nil {
+				return nil
 			}
+			go func() {
+				dd, _ := yaml.Marshal(res.Result)
+				a.SetTextAndSwitchView(string(dd))
+				go a.GetApp().Draw()
+			}()
+
+			// a.eventChan <- model.Event{
+			// 	Type:         string(model.ReadResource),
+			// 	RowIndex:     row,
+			// 	ResourceName: a.MainView.view.GetCell(row, 1).Text,
+			// 	ResourceType: strings.ToLower(resourceType),
+			// 	// This will be NA if resource in not isolator specific
+			// 	IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+			// }
 
 		case tcell.KeyCtrlD:
 			row, _ := a.MainView.view.GetSelection()
@@ -316,14 +456,23 @@ func (a *Application) SetKeyboardShortCuts() {
 				return event
 			}
 			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
-			a.eventChan <- model.Event{
-				Type:         model.ShowModal,
-				RowIndex:     row,
-				ResourceName: a.MainView.view.GetCell(row, 1).Text,
-				ResourceType: strings.ToLower(resourceType),
-				// This will be NA if resource in not isolator specific
-				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
-			}
+			// a.sendEvent(model.FrontendEvent{
+			// 	EventType:  model.NormalAction,
+			// 	ActionName: string(model.ReadResource),
+			// 	RowIndex:   row,
+			// })
+			// a.eventChan <- model.Event{
+			// 	Type:         model.ShowModal,
+			// 	RowIndex:     row,
+			// 	ResourceName: a.MainView.view.GetCell(row, 1).Text,
+			// 	ResourceType: strings.ToLower(resourceType),
+			// 	// This will be NA if resource in not isolator specific
+			// 	IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+			// }
+			go func() {
+				a.ViewModel(resourceType, a.MainView.view.GetCell(row, 1).Text)
+				a.GetApp().Draw()
+			}()
 
 			// case tcell.ctrl
 		case tcell.KeyCtrlA:
@@ -359,5 +508,5 @@ func (a *Application) SetFlashText(text string) {
 		a.rootView.RemoveItem(a.FlashView.GetView())
 		a.application.Draw()
 	}()
-	a.application.Draw()
+	go a.application.Draw()
 }

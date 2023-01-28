@@ -2,6 +2,13 @@ package shared
 
 import "github.com/sharadregoti/devops/model"
 
+type DevopsHelperServerRPC struct{ Impl DevopsHelper }
+
+func (d *DevopsHelperServerRPC) SendData(args interface{}, resp *error) error {
+	*resp = d.Impl.SendData(args)
+	return *resp
+}
+
 type DevopsServerRPC struct{ Impl Devops }
 
 func (d *DevopsServerRPC) Name(args interface{}, resp *string) error {

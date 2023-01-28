@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/common"
@@ -14,6 +13,7 @@ import (
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
 	"github.com/sharadregoti/devops/utils"
+	"github.com/sharadregoti/devops/utils/logger"
 )
 
 // Node represents a node of linked list
@@ -57,53 +57,22 @@ type CurrentPluginContext struct {
 	// currentSpecficActionList []shared.SpecificAction
 
 	tableStack tableStack
+
+	dataPipe chan model.WebsocketResponse
+
+	eventChan chan model.Event
+
+	pc *PluginClient
+
+	actionsToExecute map[string]*actionsToExecute
 }
 
-type tableStack []*resourceStack
-
-func (t *tableStack) length() int {
-	return len(*t)
+type actionsToExecute struct {
+	isExecuted bool
+	e          model.Event
 }
 
-func (t *tableStack) upsert(index int, r resourceStack) {
-	for i, _ := range *t {
-		if i == index {
-			(*t)[0] = &r
-			return
-		}
-	}
-
-	// Add if does not exists
-	*t = append(*t, &r)
-}
-
-func (t *tableStack) resetToParentResource() {
-	// Only get the first element
-	if len(*t) == 0 {
-		return
-	}
-	*t = (*t)[0:1]
-}
-
-type resourceStack struct {
-	tableRowNumber           int
-	nextResourceArgs         []map[string]interface{}
-	currentResourceType      string
-	currentResources         []interface{}
-	currentSchema            model.ResourceTransfomer
-	currentSpecficActionList []shared.SpecificAction
-}
-
-type nestedResurce struct {
-	nextResourceArgs         []map[string]interface{}
-	currentIsolator          string
-	currentResourceType      string
-	currentResources         []interface{}
-	currentSchema            model.ResourceTransfomer
-	currentSpecficActionList []shared.SpecificAction
-}
-
-func initPluginContext(logger hclog.Logger, p shared.Devops, app *views.Application, pluginName string) (*CurrentPluginContext, error) {
+func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, eventChan chan model.Event, pc *PluginClient) (*CurrentPluginContext, error) {
 	// Get known changing infor
 	info, err := p.GetGeneralInfo()
 	if err != nil {
@@ -127,16 +96,16 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, app *views.Applicat
 		return nil, err
 	}
 
-	app.SearchView.SetResourceTypes(resourceTypeList)
-	app.GeneralInfoView.Refresh(info)
-	app.IsolatorView.SetDefault(isolator)
-	app.IsolatorView.SetTitle(strings.Title(defaultIsolatorType))
+	// app.SearchView.SetResourceTypes(resourceTypeList)
+	// app.GeneralInfoView.Refresh(info)
+	// app.IsolatorView.SetDefault(isolator)
+	// app.IsolatorView.SetTitle(strings.Title(defaultIsolatorType))
 
 	return &CurrentPluginContext{
 		logger:              logger,
 		currentPluginName:   pluginName,
 		plugin:              p,
-		appView:             app,
+		appView:             nil,
 		generalInfo:         info,
 		defaultIsolatorType: defaultIsolatorType,
 		currentIsolator:     isolator,
@@ -147,7 +116,125 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, app *views.Applicat
 		// currentSchema:              model.ResourceTransfomer{},
 		currentNestedResourceLevel: 0,
 		tableStack:                 make([]*resourceStack, 0),
+		eventChan:                  eventChan,
+		pc:                         pc,
+		actionsToExecute:           map[string]*actionsToExecute{},
 	}, nil
+}
+
+func (c *CurrentPluginContext) SetDataPipe(dataPipe chan model.WebsocketResponse) {
+	logger.LogDebug("Setting data pipe for pctx")
+	c.dataPipe = dataPipe
+}
+
+func (c *CurrentPluginContext) GetDataPipe() chan model.WebsocketResponse {
+	return c.dataPipe
+}
+
+func (c *CurrentPluginContext) InvokeEvent(e model.Event) {
+	c.eventChan <- e
+	logger.LogDebug("A new event has been invoked", e.Type)
+}
+
+func (c *CurrentPluginContext) SendMessage(v model.WebsocketResponse) {
+	logger.LogDebug("Writing message into data pipe")
+	if c.dataPipe == nil {
+		return
+	}
+	c.dataPipe <- v
+	logger.LogDebug("Message written")
+}
+
+func (c *CurrentPluginContext) Close() error {
+	if c.eventChan != nil {
+		c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}
+		close(c.eventChan)
+	}
+	if c.dataPipe != nil {
+		close(c.dataPipe)
+	}
+	c.pc.Close()
+	logger.LogDebug("Closing the plugin")
+	return nil
+}
+
+func (c *CurrentPluginContext) GetCurrentResourceType() string {
+	return c.getCurrentResource().currentResourceType
+}
+
+func (c *CurrentPluginContext) GetInfo(ID string) *model.Info {
+	plugins := map[string]string{
+		"alt-0": c.currentPluginName,
+	}
+
+	genericActions := []*model.Action{
+		{
+			Type:       model.NormalAction,
+			Name:       "read",
+			KeyBinding: "ctrl-y",
+			OutputType: model.OutputTypeString,
+			// Schema: map[string]interface{}{
+			// 	"type": "object",
+			// 	"properties": map[string]interface{}{
+			// 		"kubeconfig": map[string]interface{}{
+			// 			"type": "string",
+			// 		},
+			// 		"kubeconfig": map[string]interface{}{
+			// 			"type": "string",
+			// 		},
+			// 	},
+			// 	"required": []string{
+			// 		"url",
+			// 		"userId",
+			// 		"password",
+			// 	},
+			// },
+		},
+	}
+
+	if c.currentGenericActions.IsCreate {
+		genericActions = append(genericActions, &model.Action{
+			Type:       model.NormalAction,
+			Name:       "create",
+			KeyBinding: "ctrl-b",
+			OutputType: model.OutputTypeString,
+		})
+	}
+
+	if c.currentGenericActions.IsUpdate {
+		genericActions = append(genericActions, &model.Action{
+			Type:       model.NormalAction,
+			Name:       "edit",
+			KeyBinding: "ctrl-e",
+			OutputType: model.OutputTypeBidrectional,
+		})
+	}
+	if c.currentGenericActions.IsDelete {
+		genericActions = append(genericActions, &model.Action{
+			Type:       model.NormalAction,
+			Name:       "delete",
+			KeyBinding: "ctrl-d",
+			OutputType: model.OutputTypeNothing,
+		})
+	}
+
+	// Special actions
+	genericActions = append(genericActions, &model.Action{
+		Type:       model.InternalAction,
+		Name:       "refresh",
+		KeyBinding: "ctrl-r",
+		OutputType: model.OutputTypeNothing,
+	})
+
+	return &model.Info{
+		SessionID:       ID,
+		General:         c.generalInfo,
+		Plugins:         plugins,
+		Actions:         genericActions,
+		ResourceTypes:   c.supportedResourceTypes,
+		DefaultIsolator: c.defaultIsolator,
+		IsolatorType:    c.defaultIsolatorType,
+	}
 }
 
 func (c *CurrentPluginContext) resetToParentResource() {
@@ -201,21 +288,21 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	var rs *resourceStack
 	var resourceLevel int
 	fnArgs := map[string]interface{}{}
-	if event.Type == model.ViewNestedResource {
+	if event.Type == string(model.ViewNestedResource) {
 		rs = &resourceStack{
 			currentResourceType: c.getCurrentResource().currentSchema.Nesting.ResourceType,
 		}
 		resourceLevel = c.currentNestedResourceLevel + 1
 		fnArgs = c.getCurrentResource().nextResourceArgs[event.RowIndex-1]
 		c.getCurrentResource().tableRowNumber = event.RowIndex
-	} else if event.Type == model.ReadResource {
+	} else if event.Type == string(model.ReadResource) {
 		rs = c.getCurrentResource()
-	} else if event.Type == model.ResourceTypeChanged || event.Type == model.RefreshResource {
+	} else if event.Type == string(model.ResourceTypeChanged) || event.Type == string(model.RefreshResource) {
 		c.resetToParentResource()
 		rs = &resourceStack{
 			currentResourceType: event.ResourceType,
 		}
-	} else if event.Type == model.IsolatorChanged {
+	} else if event.Type == string(model.IsolatorChanged) {
 		c.setCurrentIsolator(event.IsolatorName)
 		c.resetToParentResource()
 		rs = &resourceStack{
@@ -336,10 +423,23 @@ func SendResponse(ctx context.Context, w http.ResponseWriter, statusCode int, bo
 	return json.NewEncoder(w).Encode(body)
 }
 
+func convertSpecficAction(dd []shared.SpecificAction) []*model.Action {
+	arr := make([]*model.Action, 0)
+	for _, d := range dd {
+		arr = append(arr, &model.Action{
+			Type:       model.SpecificAction,
+			Name:       d.Name,
+			KeyBinding: d.KeyBinding,
+			OutputType: model.OutputType(d.OutputType),
+		})
+	}
+	return arr
+}
+
 func (c *CurrentPluginContext) setAppView() {
 
 	rs := c.tableStack[c.currentNestedResourceLevel]
-	table, nestArgs, err := transformer.GetResourceInTableFormat(c.logger, &rs.currentSchema, rs.currentResources)
+	tableData, nestArgs, err := transformer.GetResourceInTableFormat(c.logger, &rs.currentSchema, rs.currentResources)
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
@@ -350,14 +450,19 @@ func (c *CurrentPluginContext) setAppView() {
 		rs.nextResourceArgs = nestArgs
 	}
 
-	c.appView.SpecificActionView.RefreshActions(rs.currentSpecficActionList)
-	c.appView.ActionView.RefreshActions(c.currentGenericActions)
-	c.appView.ActionView.EnableNesting(rs.currentSchema.Nesting.IsNested)
-	c.appView.RemoveSearchView()
-	c.appView.MainView.Refresh(table, rs.tableRowNumber)
-	c.appView.MainView.SetTitle(utils.GetTableTitle(rs.currentResourceType, len(rs.currentResources)))
-	c.appView.GetApp().SetFocus(c.appView.MainView.GetView())
-	c.appView.GetApp().Draw()
+	c.SendMessage(model.WebsocketResponse{
+		TableName:       utils.GetTableTitle(rs.currentResourceType, len(rs.currentResources)),
+		Data:            tableData,
+		SpecificActions: convertSpecficAction(rs.currentSpecficActionList),
+	})
+	// c.appView.SpecificActionView.RefreshActions(rs.currentSpecficActionList)
+	// c.appView.ActionView.RefreshActions(c.currentGenericActions)
+	// c.appView.ActionView.EnableNesting(rs.currentSchema.Nesting.IsNested)
+	// c.appView.RemoveSearchView()
+	// c.appView.MainView.Refresh(table, rs.tableRowNumber)
+	// c.appView.MainView.SetTitle(utils.GetTableTitle(rs.currentResourceType, len(rs.currentResources)))
+	// c.appView.GetApp().SetFocus(c.appView.MainView.GetView())
+	// c.appView.GetApp().Draw()
 }
 
 // func (c *CurrentPluginContext) syncNestResource(row int, eventType string) {

@@ -11,5 +11,5 @@ func GetTableTitle(title string, total int) string {
 
 func ParseTableTitle(title string) (string, string) {
 	arr := strings.Split(title, " ")
-	return arr[0], strings.TrimPrefix(strings.TrimSuffix(arr[1], ")"), "(")
+	return strings.ToLower(arr[0]), strings.TrimPrefix(strings.TrimSuffix(arr[1], ")"), "(")
 }

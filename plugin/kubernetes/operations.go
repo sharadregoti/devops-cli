@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -89,32 +88,78 @@ func (d *Kubernetes) getPodLogs(resourceName, namespace, containerName string) (
 		containerName = cont
 	}
 
-	arguments := []string{"logs", resourceName, "-n", namespace, "-f", containerName}
+	arguments := []string{command, "logs", resourceName, "-n", namespace, "-f", containerName}
 
 	d.logger.Debug(fmt.Sprintf("Fetching logs for %s %v", command, arguments))
 
-	cc := exec.Command(command, arguments...)
+	// cc := exec.Command(command, arguments...)
 
-	cc.Stdin = os.Stdin
-	cc.Stderr = os.Stderr
-	cc.Stdout = os.Stdout
+	// cc.Stdin = os.Stdin
+	// cc.Stderr = os.Stderr
+	// cc.Stdout = os.Stdout
 
-	if err := cc.Start(); err != nil {
-		common.Error(d.logger, fmt.Sprintf("failed to get logs, got %v", err))
+	// if err := cc.Start(); err != nil {
+	// 	common.Error(d.logger, fmt.Sprintf("failed to get logs, got %v", err))
+	// 	return "", err
+	// }
+
+	// go func() {
+	// 	for range d.activeChans {
+	// 		d.logger.Debug("Closing log resource")
+	// 		if err := cc.Process.Signal(os.Interrupt); err != nil {
+	// 			common.Error(d.logger, fmt.Sprintf("failed to close log stream, got %v", err))
+	// 		}
+	// 		return
+	// 	}
+	// }()
+
+	d.logger.Debug("Log fetching started")
+	return strings.Join(arguments, " "), nil
+}
+
+func (d *Kubernetes) execPod(resourceName, namespace, containerName string) (string, error) {
+	// Set the command to execute
+	command := "kubectl"
+
+	if containerName == "" {
+		cont, err := d.getContainers(context.Background(), namespace, resourceName)
+		if err != nil {
+			return "", err
+		}
+		containerName = cont
+	}
+
+	arguments := []string{command, "exec", resourceName, "-n", namespace, "-it", "-c", containerName, "--", "sh"}
+
+	return strings.Join(arguments, " "), nil
+}
+
+func (d *Kubernetes) portForward(resourceName, namespace string, args map[string]interface{}) (string, error) {
+	// Set the command to execute
+	command := "kubectl"
+
+	cp := args["containerPort"].(string)
+	lp := args["localPort"].(string)
+	addr := args["address"].(string)
+
+	if cp == "" {
+		return "", fmt.Errorf("container port not provided")
+	}
+	if lp == "" {
+		return "", fmt.Errorf("container local port not provided")
+	}
+	if addr == "" {
+		return "", fmt.Errorf("address not provided")
+	}
+
+	arguments := []string{"port-forward", "-n", namespace, "--address", addr, resourceName, fmt.Sprintf("%s:%s", lp, cp)}
+
+	cmd := exec.Command(command, arguments...)
+	if err := cmd.Start(); err != nil {
 		return "", err
 	}
 
-	go func() {
-		for range d.activeChans {
-			d.logger.Debug("Closing log resource")
-			if err := cc.Process.Signal(os.Interrupt); err != nil {
-				common.Error(d.logger, fmt.Sprintf("failed to close log stream, got %v", err))
-			}
-			return
-		}
-	}()
-
-	d.logger.Debug("Log fetching started")
+	d.logger.Debug("Port forward started")
 	return "", nil
 }
 

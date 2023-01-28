@@ -106,6 +106,10 @@ func (p *PluginClient) GetStdoutReader() *io.PipeReader {
 	return p.stdOutReader
 }
 
+func (p *PluginClient) GetStdoutWriter() *io.PipeWriter {
+	return p.stdOutWriter
+}
+
 func (p *PluginClient) Close() {
 	// TODO: close error writer as well
 	p.stdOutReader.Close()

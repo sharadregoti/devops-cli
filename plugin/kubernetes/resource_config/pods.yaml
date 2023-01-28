@@ -59,3 +59,10 @@ specific_actions:
     key_binding: "l"
     scrren_action: "view"
     output_type: "stream"
+  - name: "shell"
+    key_binding: "s"
+    output_type: "bidirectional"
+  - name: "port-forward"
+    key_binding: "f"
+    output_type: "nothing"
+

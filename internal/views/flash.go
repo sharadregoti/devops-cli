@@ -2,23 +2,19 @@ package views
 
 import (
 	"github.com/gdamore/tcell/v2"
-	"github.com/hashicorp/go-hclog"
 	"github.com/rivo/tview"
-	"github.com/sharadregoti/devops/model"
 )
 
 type FlashView struct {
-	view   *tview.TextView
-	logger hclog.Logger
+	view *tview.TextView
 }
 
-func NewFlashView(logger hclog.Logger, c chan model.Event) *FlashView {
+func NewFlashView() *FlashView {
 	t := tview.NewTextView()
 	t.SetTextColor(tcell.ColorYellow)
 
 	v := &FlashView{
-		view:   t,
-		logger: logger.Named("flash-view"),
+		view: t,
 	}
 
 	return v

@@ -7,6 +7,18 @@ import (
 	"github.com/sharadregoti/devops/model"
 )
 
+type DevopsHelperClientRPC struct{ client *rpc.Client }
+
+func (d *DevopsHelperClientRPC) SendData(args interface{}) error {
+	var resp error
+	err := d.client.Call("Plugin.SendData", &args, &resp)
+	if err != nil {
+		return err
+	}
+
+	return resp
+}
+
 type DevopsClientRPC struct{ client *rpc.Client }
 
 func (d *DevopsClientRPC) Name() string {

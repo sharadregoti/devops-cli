@@ -6,22 +6,21 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/sahilm/fuzzy"
-	"github.com/sharadregoti/devops/model"
 )
 
 type SearchView struct {
 	view *tview.InputField
 }
 
-func NewSearchView(c chan model.Event) *SearchView {
+func NewSearchView() *SearchView {
 	searchBox := tview.NewInputField()
 	searchBox.SetFieldBackgroundColor(tcell.Color100)
 	searchBox.Autocomplete().SetDoneFunc(func(key tcell.Key) {
-		c <- model.Event{
-			Type:         model.ResourceTypeChanged,
-			ResourceType: searchBox.GetText(),
-		}
-		searchBox.SetText("")
+		// c <- model.Event{
+		// 	Type:         string(model.ResourceTypeChanged),
+		// 	ResourceType: searchBox.GetText(),
+		// }
+		// searchBox.SetText("")
 	})
 
 	return &SearchView{

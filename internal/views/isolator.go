@@ -4,25 +4,21 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/rivo/tview"
-	"github.com/sharadregoti/devops/model"
 )
 
 type IsolatorView struct {
 	view          *tview.TextView
 	currentKeyMap []string
-	logger        hclog.Logger
 }
 
-func NewIsolatorView(logger hclog.Logger, c chan model.Event) *IsolatorView {
+func NewIsolatorView() *IsolatorView {
 	t := tview.NewTextView()
 	t.SetBorder(true)
 	t.SetTitle("Isolator")
 
 	v := &IsolatorView{
 		view:          t,
-		logger:        logger.Named("isolator"),
 		currentKeyMap: make([]string, 0),
 	}
 
@@ -68,7 +64,6 @@ func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
 	// Don't add key if already exists
 	for _, v := range g.currentKeyMap {
 		if v == isolatorName {
-			g.logger.Debug(fmt.Sprintf("trying to add the same isolator key <%s>, ignoring it", isolatorName))
 			return
 		}
 	}
