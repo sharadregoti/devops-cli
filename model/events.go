@@ -29,10 +29,10 @@ type SpecficEvent string
 type OutputType string
 
 const (
-	OutputTypeString       OutputType = "string"
-	OutputTypeNothing      OutputType = "nothing"
-	OutputTypeStream       OutputType = "stream"
-	OutputTypeBidrectional OutputType = "bidirectional"
+	OutputTypeString       string = "string"
+	OutputTypeNothing      string = "nothing"
+	OutputTypeStream       string = "stream"
+	OutputTypeBidrectional string = "bidirectional"
 )
 
 const (

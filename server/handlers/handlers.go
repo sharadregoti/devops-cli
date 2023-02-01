@@ -103,39 +103,55 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 			switch model.NormalEvent(req.ActionName) {
 
 			case model.CreateResource:
+				err := pCtx.Create(e)
+				if err != nil {
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
+					return
+				}
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
+				return
 
 			case model.EditResource:
+				err := pCtx.Update(e)
+				if err != nil {
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
+					return
+				}
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
+				return
 
 			case model.ReadResource:
 				result, err := pCtx.Read(e)
 				if err != nil {
-					_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
 
-				_ = utils.SendResponse(r.Context(), w, http.StatusOK, &model.EventResponse{Result: result})
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: result})
 				return
 
 			case model.DeleteResource:
 				if pCtx.Delete(e); err != nil {
-					_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
 
-				_ = utils.SendResponse(r.Context(), w, http.StatusOK, &model.EventResponse{})
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 
 			case model.IsolatorChanged:
 				if pCtx.ReadSync(e); err != nil {
-					_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
 
-				_ = utils.SendResponse(r.Context(), w, http.StatusOK, &model.EventResponse{})
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 
 			default:
-				_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, fmt.Errorf("unknown normal event  %v provided", req.EventType))
+				_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, fmt.Errorf("unknown normal event  %v provided", req.EventType))
 				return
 			}
 		case model.InternalAction:
@@ -143,30 +159,30 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 
 			case model.RefreshResource:
 				if pCtx.ReadSync(e); err != nil {
-					_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
 
-				_ = utils.SendResponse(r.Context(), w, http.StatusOK, &model.EventResponse{})
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 
 			case model.ResourceTypeChanged:
 				if pCtx.ReadSync(e); err != nil {
-					_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
 
-				_ = utils.SendResponse(r.Context(), w, http.StatusOK, &model.EventResponse{})
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 
 			default:
-				_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, fmt.Errorf("unknown internal event  %v provided", req.EventType))
+				_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, fmt.Errorf("unknown internal event  %v provided", req.EventType))
 				return
 			}
 		case model.SpecificAction:
 			actions, err := pCtx.GetSpecficActionList(e)
 			if err != nil {
-				_ = utils.SendResponse(r.Context(), w, http.StatusOK, &model.EventResponse{})
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 			}
 
@@ -176,24 +192,23 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 
 					res, err := pCtx.SpecificAction(a, e)
 					if err != nil {
-						_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+						_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 						return
 					}
 
-					_ = utils.SendResponse(r.Context(), w, http.StatusOK, res)
+					_ = utils.SendResponse(ctx, w, http.StatusOK, res)
 					return
 				}
 			}
 
-			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, fmt.Errorf("action not found"))
+			_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, fmt.Errorf("action not found"))
 			return
 
 		default:
-			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, fmt.Errorf("invalid event type %v provided", req.EventType))
+			_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, fmt.Errorf("invalid event type %v provided", req.EventType))
 			return
 		}
 
-		_ = utils.SendResponse(ctx, w, http.StatusOK, map[string]string{})
 	}
 }
 
@@ -245,23 +260,6 @@ func HandleWebsocket(sm *core.SessionManager) http.HandlerFunc {
 	}
 }
 
-type socketReadWriter struct {
-	Socket *websocket.Conn
-}
-
-func (srw socketReadWriter) Write(p []byte) (n int, err error) {
-	err = srw.Socket.WriteMessage(websocket.TextMessage, p)
-	return len(p), err
-}
-
-func (srw socketReadWriter) Read(p []byte) (n int, err error) {
-	_, b, err := srw.Socket.ReadMessage()
-	for i, d := range b {
-		p[i] = d
-	}
-	return len(b), err
-}
-
 func HandleActionWebsocket(sm *core.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -284,7 +282,7 @@ func HandleActionWebsocket(sm *core.SessionManager) http.HandlerFunc {
 		}
 
 		// Invoke specific event
-		if err := pCtx.PerformSavedAction(ID, socketReadWriter{Socket: conn}); err != nil {
+		if err := pCtx.PerformSavedAction(ID, model.WebsocketReadWriter{Socket: conn}); err != nil {
 			data, _ := json.Marshal(model.ErrorResponse{Message: fmt.Errorf("failed to perform specific action: %v", err).Error()})
 			conn.WriteMessage(websocket.CloseMessage, data)
 			return

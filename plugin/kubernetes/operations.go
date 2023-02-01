@@ -178,6 +178,76 @@ func (d *Kubernetes) DescribeResource(resourceType, resourceName, namespace stri
 	return string(output), nil
 }
 
+func (d *Kubernetes) createResource(ctx context.Context, args shared.ActionCreateResourceArgs) error {
+	rt, ok := d.resourceTypes[args.ResourceType]
+	if !ok {
+		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
+		return fmt.Errorf("Delete: could not find resource type %s in current kubernetes context", args.ResourceType)
+	}
+
+	resourceId := schema.GroupVersionResource{
+		Group:    rt.group,
+		Version:  rt.version,
+		Resource: rt.resourceTypeName,
+	}
+
+	objMap, ok := args.Data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("could not convert data to map[string]interface{}")
+	}
+
+	data := &unstructured.Unstructured{
+		Object: objMap,
+	}
+
+	var err error
+	if rt.isNamespaced {
+		_, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorName).Create(ctx, data, metav1.CreateOptions{})
+	} else {
+		_, err = d.dynamicClient.Resource(resourceId).Create(ctx, data, metav1.CreateOptions{})
+	}
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (d *Kubernetes) updateResource(ctx context.Context, args shared.ActionUpdateResourceArgs) error {
+	rt, ok := d.resourceTypes[args.ResourceType]
+	if !ok {
+		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
+		return fmt.Errorf("Delete: could not find resource type %s in current kubernetes context", args.ResourceType)
+	}
+
+	resourceId := schema.GroupVersionResource{
+		Group:    rt.group,
+		Version:  rt.version,
+		Resource: rt.resourceTypeName,
+	}
+
+	objMap, ok := args.Data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("could not convert data to map[string]interface{}")
+	}
+
+	data := &unstructured.Unstructured{
+		Object: objMap,
+	}
+
+	var err error
+	if rt.isNamespaced {
+		_, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorName).Update(ctx, data, metav1.UpdateOptions{})
+	} else {
+		_, err = d.dynamicClient.Resource(resourceId).Update(ctx, data, metav1.UpdateOptions{})
+	}
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 func (d *Kubernetes) deleteResource(ctx context.Context, args shared.ActionDeleteResourceArgs) error {
 	rt, ok := d.resourceTypes[args.ResourceType]
 	if !ok {

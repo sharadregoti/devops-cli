@@ -3,8 +3,6 @@ package shared
 import (
 	"fmt"
 	"net/rpc"
-
-	"github.com/sharadregoti/devops/model"
 )
 
 type DevopsHelperClientRPC struct{ client *rpc.Client }
@@ -51,7 +49,7 @@ func (d *DevopsClientRPC) GetResources(args GetResourcesArgs) ([]interface{}, er
 	return resp, nil
 }
 
-func (d *DevopsClientRPC) WatchResources(resourceType string) (chan WatchResourceResult, error) {
+func (d *DevopsClientRPC) WatchResources(resourceType string) (WatcheResource, error) {
 	var resp = make(chan WatchResourceResult, 1)
 	err := d.client.Call("Plugin.WatchResources", &resourceType, &resp)
 	if err != nil {
@@ -71,8 +69,8 @@ func (d *DevopsClientRPC) CloseResourceWatcher(resourceType string) error {
 	return er
 }
 
-func (d *DevopsClientRPC) GetResourceTypeSchema(resourceType string) (model.ResourceTransfomer, error) {
-	var resp model.ResourceTransfomer
+func (d *DevopsClientRPC) GetResourceTypeSchema(resourceType string) (ResourceTransfomer, error) {
+	var resp ResourceTransfomer
 	err := d.client.Call("Plugin.GetResourceTypeSchema", &resourceType, &resp)
 	if err != nil {
 		return resp, fmt.Errorf("grpc client function invocation fixed: %w", err)
@@ -121,11 +119,12 @@ func (d *DevopsClientRPC) GetDefaultResourceIsolator() (string, error) {
 	return resp, nil
 }
 
-func (d *DevopsClientRPC) GetSupportedActions(resourceType string) (GenericActions, error) {
-	var resp GenericActions
-	err := d.client.Call("Plugin.GetSupportedActions", &resourceType, &resp)
+func (d *DevopsClientRPC) GetSupportedActions() ([]Action, error) {
+	var resp []Action
+	var input string
+	err := d.client.Call("Plugin.GetSupportedActions", &input, &resp)
 	if err != nil {
-		return GenericActions{}, fmt.Errorf("grpc client function invocation fixed: %w", err)
+		return []Action{}, fmt.Errorf("grpc client function invocation fixed: %w", err)
 	}
 
 	return resp, nil
@@ -141,8 +140,28 @@ func (d *DevopsClientRPC) ActionDeleteResource(args ActionDeleteResourceArgs) er
 	return err
 }
 
-func (d *DevopsClientRPC) GetSpecficActionList(resourceType string) ([]SpecificAction, error) {
-	var resp []SpecificAction
+func (d *DevopsClientRPC) ActionCreateResource(args ActionCreateResourceArgs) error {
+	var er error
+	err := d.client.Call("Plugin.ActionCreateResource", &args, &er)
+	if err != nil {
+		return fmt.Errorf("grpc client function invocation fixed: %w", err)
+	}
+
+	return err
+}
+
+func (d *DevopsClientRPC) ActionUpdateResource(args ActionUpdateResourceArgs) error {
+	var er error
+	err := d.client.Call("Plugin.ActionUpdateResource", &args, &er)
+	if err != nil {
+		return fmt.Errorf("grpc client function invocation fixed: %w", err)
+	}
+
+	return err
+}
+
+func (d *DevopsClientRPC) GetSpecficActionList(resourceType string) ([]Action, error) {
+	var resp []Action
 	err := d.client.Call("Plugin.GetSpecficActionList", &resourceType, &resp)
 	if err != nil {
 		return nil, fmt.Errorf("grpc client function invocation fixed: %w", err)

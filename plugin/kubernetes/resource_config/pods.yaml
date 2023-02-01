@@ -53,16 +53,32 @@ styles:
 specific_actions:
   - name: "describe"
     key_binding: "d"
-    scrren_action: "view"
+    execution:
+      cmd: "kubectl describe {{.resourceType}} {{.resourceName}} -n {{.isolatorName}}"
     output_type: "string"
   - name: "logs"
     key_binding: "l"
-    scrren_action: "view"
+    execution:
+      cmd: "kubectl logs {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -f"
     output_type: "stream"
   - name: "shell"
     key_binding: "s"
+    execution:
+      cmd: 'kubectl exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh'
+      # cmd: 'kubectl exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh -c "command -v bash >/dev/null && exec bash || exec sh"'
     output_type: "bidirectional"
   - name: "port-forward"
     key_binding: "f"
     output_type: "nothing"
+    execution:
+      cmd: "kubectl port-forward {{.resourceName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}"
+      is_long_running: true
+      user_input:
+        required: true
+        args:
+          containerPort: "{{(index .resource.spec.containers 0).(index .ports 0).containerPort}}"
+          localPort: "{{.resource.spec.containers[0].ports[0].containerPort}}"
+          address: "localhost"
+      server_input: 
+        required: false
 

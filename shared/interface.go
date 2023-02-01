@@ -1,7 +1,5 @@
 package shared
 
-import "github.com/sharadregoti/devops/model"
-
 type DevopsHelper interface {
 	SendData(data interface{}) error
 }
@@ -24,9 +22,9 @@ type GetResourcesArgs struct {
 
 type MainBox interface {
 	GetResources(args GetResourcesArgs) ([]interface{}, error)
-	WatchResources(resourceType string) (chan WatchResourceResult, error)
+	WatchResources(resourceType string) (WatcheResource, error)
 	CloseResourceWatcher(resourceType string) error
-	GetResourceTypeSchema(resourceType string) (model.ResourceTransfomer, error)
+	GetResourceTypeSchema(resourceType string) (ResourceTransfomer, error)
 }
 
 type SearchBox interface {
@@ -50,33 +48,25 @@ type ChatGPTBox interface {
 	GetResourceTypeConditions() error
 }
 
-type GenericActions struct {
-	// Read is supported by default
-	IsDelete bool
-	IsUpdate bool
-	IsCreate bool
-}
-
 type ActionDeleteResourceArgs struct {
 	ResourceName, ResourceType, IsolatorName string
 }
 
-type GenericResourceActions interface {
-	GetSupportedActions(resourceType string) (GenericActions, error)
-	ActionDeleteResource(args ActionDeleteResourceArgs) error
-	// ActionApplyResource(data interface{}, resourceType string) error
+type ActionCreateResourceArgs struct {
+	ResourceName, ResourceType, IsolatorName string
+	Data                                     interface{}
 }
 
-type SpecificAction struct {
-	Name       string
-	KeyBinding string
+type ActionUpdateResourceArgs struct {
+	ResourceName, ResourceType, IsolatorName string
+	Data                                     interface{}
+}
 
-	// View, Edit, Confirmation
-	ScrrenAction string
-
-	// String, Object
-	OutputType string
-	ResourceID string
+type GenericResourceActions interface {
+	GetSupportedActions() ([]Action, error)
+	ActionDeleteResource(args ActionDeleteResourceArgs) error
+	ActionCreateResource(ActionCreateResourceArgs) error
+	ActionUpdateResource(ActionUpdateResourceArgs) error
 }
 
 type SpecificActionArgs struct {
@@ -97,6 +87,6 @@ type SpecificActionResult struct {
 }
 
 type ResourceSpecificActions interface {
-	GetSpecficActionList(resourceType string) ([]SpecificAction, error)
+	GetSpecficActionList(resourceType string) ([]Action, error)
 	PerformSpecificAction(args SpecificActionArgs) (SpecificActionResult, error)
 }

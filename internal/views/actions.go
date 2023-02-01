@@ -2,7 +2,7 @@ package views
 
 import (
 	"github.com/rivo/tview"
-	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/shared"
 )
 
 type Actions struct {
@@ -24,7 +24,7 @@ func (g *Actions) EnableNesting(v bool) {
 	g.nestingEnabled = v
 }
 
-func (g *Actions) RefreshActions(arr []*model.Action) {
+func (g *Actions) RefreshActions(arr []shared.Action) {
 	tempMap := map[string]string{}
 
 	for _, a := range arr {

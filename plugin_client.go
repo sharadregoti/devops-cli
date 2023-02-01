@@ -58,7 +58,7 @@ func checIfPluginExists(rooDir string, c *model.Config) {
 func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient, error) {
 	gob.Register(map[string]interface{}{})
 	gob.Register([]interface{}{})
-	gob.Register(make(chan shared.WatchResourceResult))
+	gob.Register(make(shared.WatcheResource, 1))
 	gob.Register(time.Time{})
 
 	path := getPluginPath(pluginName, rootDir)

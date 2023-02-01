@@ -53,7 +53,7 @@ type CurrentPluginContext struct {
 	// currentResources []interface{}
 	// currentSchema    model.ResourceTransfomer
 
-	currentGenericActions shared.GenericActions
+	currentGenericActions []shared.Action
 	// currentSpecficActionList []shared.SpecificAction
 
 	tableStack tableStack
@@ -96,20 +96,27 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, 
 		return nil, err
 	}
 
+	actions, err := p.GetSupportedActions()
+	if err != nil {
+		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
+		return nil, err
+	}
+
 	// app.SearchView.SetResourceTypes(resourceTypeList)
 	// app.GeneralInfoView.Refresh(info)
 	// app.IsolatorView.SetDefault(isolator)
 	// app.IsolatorView.SetTitle(strings.Title(defaultIsolatorType))
 
 	return &CurrentPluginContext{
-		logger:              logger,
-		currentPluginName:   pluginName,
-		plugin:              p,
-		appView:             nil,
-		generalInfo:         info,
-		defaultIsolatorType: defaultIsolatorType,
-		currentIsolator:     isolator,
-		defaultIsolator:     isolator,
+		logger:                logger,
+		currentPluginName:     pluginName,
+		plugin:                p,
+		appView:               nil,
+		generalInfo:           info,
+		defaultIsolatorType:   defaultIsolatorType,
+		currentIsolator:       isolator,
+		defaultIsolator:       isolator,
+		currentGenericActions: actions,
 		// currentResourceType:        "",
 		// currentResources:           make([]interface{}, 0),
 		supportedResourceTypes: resourceTypeList,
@@ -167,70 +174,11 @@ func (c *CurrentPluginContext) GetInfo(ID string) *model.Info {
 		"alt-0": c.currentPluginName,
 	}
 
-	genericActions := []*model.Action{
-		{
-			Type:       model.NormalAction,
-			Name:       "read",
-			KeyBinding: "ctrl-y",
-			OutputType: model.OutputTypeString,
-			// Schema: map[string]interface{}{
-			// 	"type": "object",
-			// 	"properties": map[string]interface{}{
-			// 		"kubeconfig": map[string]interface{}{
-			// 			"type": "string",
-			// 		},
-			// 		"kubeconfig": map[string]interface{}{
-			// 			"type": "string",
-			// 		},
-			// 	},
-			// 	"required": []string{
-			// 		"url",
-			// 		"userId",
-			// 		"password",
-			// 	},
-			// },
-		},
-	}
-
-	if c.currentGenericActions.IsCreate {
-		genericActions = append(genericActions, &model.Action{
-			Type:       model.NormalAction,
-			Name:       "create",
-			KeyBinding: "ctrl-b",
-			OutputType: model.OutputTypeString,
-		})
-	}
-
-	if c.currentGenericActions.IsUpdate {
-		genericActions = append(genericActions, &model.Action{
-			Type:       model.NormalAction,
-			Name:       "edit",
-			KeyBinding: "ctrl-e",
-			OutputType: model.OutputTypeBidrectional,
-		})
-	}
-	if c.currentGenericActions.IsDelete {
-		genericActions = append(genericActions, &model.Action{
-			Type:       model.NormalAction,
-			Name:       "delete",
-			KeyBinding: "ctrl-d",
-			OutputType: model.OutputTypeNothing,
-		})
-	}
-
-	// Special actions
-	genericActions = append(genericActions, &model.Action{
-		Type:       model.InternalAction,
-		Name:       "refresh",
-		KeyBinding: "ctrl-r",
-		OutputType: model.OutputTypeNothing,
-	})
-
 	return &model.Info{
 		SessionID:       ID,
 		General:         c.generalInfo,
 		Plugins:         plugins,
-		Actions:         genericActions,
+		Actions:         c.currentGenericActions,
 		ResourceTypes:   c.supportedResourceTypes,
 		DefaultIsolator: c.defaultIsolator,
 		IsolatorType:    c.defaultIsolatorType,
@@ -348,7 +296,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	// 	return
 	// }
 
-	actions, err := c.plugin.GetSupportedActions(rs.currentResourceType)
+	actions, err := c.plugin.GetSupportedActions()
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to get supported actions of resource: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
@@ -364,7 +312,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	}
 
 	if rs.currentResourceType == c.defaultIsolatorType {
-		specificActions = append(specificActions, shared.SpecificAction{Name: "Use", KeyBinding: "u"})
+		specificActions = append(specificActions, shared.Action{Name: "Use", KeyBinding: "u"})
 	}
 	// c.currentSpecficActionList = specificActions
 
@@ -423,18 +371,18 @@ func SendResponse(ctx context.Context, w http.ResponseWriter, statusCode int, bo
 	return json.NewEncoder(w).Encode(body)
 }
 
-func convertSpecficAction(dd []shared.SpecificAction) []*model.Action {
-	arr := make([]*model.Action, 0)
-	for _, d := range dd {
-		arr = append(arr, &model.Action{
-			Type:       model.SpecificAction,
-			Name:       d.Name,
-			KeyBinding: d.KeyBinding,
-			OutputType: model.OutputType(d.OutputType),
-		})
-	}
-	return arr
-}
+// func convertSpecficAction(dd []shared.SpecificAction) []*model.Action {
+// 	arr := make([]*model.Action, 0)
+// 	for _, d := range dd {
+// 		arr = append(arr, &model.Action{
+// 			Type:       model.SpecificAction,
+// 			Name:       d.Name,
+// 			KeyBinding: d.KeyBinding,
+// 			OutputType: model.OutputType(d.OutputType),
+// 		})
+// 	}
+// 	return arr
+// }
 
 func (c *CurrentPluginContext) setAppView() {
 
@@ -453,7 +401,7 @@ func (c *CurrentPluginContext) setAppView() {
 	c.SendMessage(model.WebsocketResponse{
 		TableName:       utils.GetTableTitle(rs.currentResourceType, len(rs.currentResources)),
 		Data:            tableData,
-		SpecificActions: convertSpecficAction(rs.currentSpecficActionList),
+		SpecificActions: rs.currentSpecficActionList,
 	})
 	// c.appView.SpecificActionView.RefreshActions(rs.currentSpecficActionList)
 	// c.appView.ActionView.RefreshActions(c.currentGenericActions)

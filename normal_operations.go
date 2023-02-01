@@ -37,12 +37,12 @@ func (c *CurrentPluginContext) ReadSync(e model.Event) error {
 	c.SendMessage(model.WebsocketResponse{
 		TableName:       utils.GetTableTitle(e.ResourceType, len(resources)),
 		Data:            tableData,
-		SpecificActions: convertSpecficAction(specificActions),
+		SpecificActions: specificActions,
 	})
 	return nil
 }
 
-func (c *CurrentPluginContext) GetSpecficActionList(e model.Event) ([]shared.SpecificAction, error) {
+func (c *CurrentPluginContext) GetSpecficActionList(e model.Event) ([]shared.Action, error) {
 	return c.plugin.GetSpecficActionList(e.ResourceType)
 }
 
@@ -63,4 +63,12 @@ func (c *CurrentPluginContext) Read(e model.Event) (map[string]interface{}, erro
 
 func (c *CurrentPluginContext) Delete(e model.Event) error {
 	return c.plugin.ActionDeleteResource(shared.ActionDeleteResourceArgs{ResourceName: e.ResourceName, ResourceType: e.ResourceType, IsolatorName: e.IsolatorName})
+}
+
+func (c *CurrentPluginContext) Create(e model.Event) error {
+	return c.plugin.ActionCreateResource(shared.ActionCreateResourceArgs{ResourceName: e.ResourceName, ResourceType: e.ResourceType, IsolatorName: e.IsolatorName, Data: e.Args})
+}
+
+func (c *CurrentPluginContext) Update(e model.Event) error {
+	return c.plugin.ActionUpdateResource(shared.ActionUpdateResourceArgs{ResourceName: e.ResourceName, ResourceType: e.ResourceType, IsolatorName: e.IsolatorName, Data: e.Args})
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/kr/pty"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
+	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
 	"golang.org/x/term"
 )
@@ -171,7 +172,44 @@ func (c *CurrentPluginContext) saveAction(e model.Event) (*model.EventResponse, 
 	return &model.EventResponse{ID: id}, nil
 }
 
-func (c *CurrentPluginContext) SpecificAction(a shared.SpecificAction, e model.Event) (*model.EventResponse, error) {
+func (c *CurrentPluginContext) ExecuteSpecificActionTemplate(a shared.Action, e model.Event) (string, error) {
+	res, err := c.Read(e)
+	if err != nil {
+		return "", logger.LogError("failed to read resource: %v", err)
+	}
+
+	params := map[string]interface{}{
+		"resourceName": e.ResourceName,
+		"resourceType": e.ResourceType,
+		"isolatorName": e.IsolatorName,
+		"resource":     res,
+		"args":         e.Args,
+	}
+
+	templateExecutedArgs := map[string]interface{}{}
+	for key, value := range e.Args {
+		strValue, ok := value.(string)
+		if ok && strValue != "" {
+			logger.LogDebug("Executing template args having key (%s)", key)
+			res, err := utils.ExecuteTemplate(strValue, params)
+			if err != nil {
+				return "", logger.LogError("failed to execute template: %v", err)
+			}
+			templateExecutedArgs[key] = res
+			continue
+		}
+		templateExecutedArgs[key] = value
+	}
+
+	tempRes, err := utils.ExecuteTemplate(a.Execution.Cmd, params)
+	if err != nil {
+		return "", logger.LogError("failed to execute template: %v", err)
+	}
+
+	return tempRes, nil
+}
+
+func (c *CurrentPluginContext) SpecificAction(a shared.Action, e model.Event) (*model.EventResponse, error) {
 	fnArgs := shared.SpecificActionArgs{
 		ActionName:   e.Type,
 		ResourceName: e.ResourceName,
@@ -180,17 +218,57 @@ func (c *CurrentPluginContext) SpecificAction(a shared.SpecificAction, e model.E
 		Args:         e.Args,
 	}
 
-	switch a.OutputType {
-
-	case string(model.OutputTypeString), string(model.OutputTypeNothing):
+	var result interface{}
+	var err error
+	if a.Execution.Cmd != "" {
+		result, err = c.ExecuteSpecificActionTemplate(a, e)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Execute actual action
 		res, err := c.plugin.PerformSpecificAction(fnArgs)
 		if err != nil {
 			return nil, err
 		}
-		return &model.EventResponse{Result: res.Result}, nil
+		result = res.Result
+	}
+
+	switch a.OutputType {
+
+	case string(model.OutputTypeString):
+		res, err := utils.ExecuteCMDGetOutput(result.(string))
+		if err != nil {
+			return nil, err
+		}
+		return &model.EventResponse{Result: res}, nil
+
+	case string(model.OutputTypeNothing):
+		if a.Execution.IsLongRunning {
+			err := utils.ExecuteCMDLong(result.(string))
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			_, err := utils.ExecuteCMDGetOutput(result.(string))
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &model.EventResponse{}, nil
 
 	case string(model.OutputTypeBidrectional), string(model.OutputTypeStream):
-		return c.saveAction(e)
+		// res, err := c.plugin.PerformSpecificAction(fnArgs)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// TODO: remove action after some time
+		saRes, err := c.saveAction(e)
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.EventResponse{Result: result, ID: saRes.ID}, nil
 
 	default:
 		return nil, fmt.Errorf("invalid output type (%v) provided for executing specfic action", a.OutputType)

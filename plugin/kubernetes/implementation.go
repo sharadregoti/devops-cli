@@ -62,7 +62,7 @@ func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 }
 
 // TODO: test & fix this
-func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResourceResult, error) {
+func (d *Kubernetes) WatchResources(resourceType string) (shared.WatcheResource, error) {
 	res, ok := d.resourceWatcherChanMap[resourceType]
 	if ok {
 		// Send it
@@ -72,7 +72,7 @@ func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResou
 
 	d.logger.Debug("Creating a new channel for resource", resourceType)
 	d.lock.Lock()
-	c := make(chan shared.WatchResourceResult, 1)
+	c := make(shared.WatcheResource, 1)
 	d.resourceWatcherChanMap[resourceType] = c
 	d.lock.Unlock()
 
@@ -88,7 +88,7 @@ func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResou
 	return c, nil
 }
 
-func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (model.ResourceTransfomer, error) {
+func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (shared.ResourceTransfomer, error) {
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
@@ -145,36 +145,58 @@ func (d *Kubernetes) GetDefaultResourceIsolator() (string, error) {
 	return "default", nil
 }
 
-func (d *Kubernetes) GetSupportedActions(resourceType string) (shared.GenericActions, error) {
-	return shared.GenericActions{
-		IsDelete: true,
-		IsUpdate: false,
-		IsCreate: false,
-	}, nil
+func (d *Kubernetes) GetSupportedActions() ([]shared.Action, error) {
+	genericActions := []shared.Action{
+		{
+			Name:       "read",
+			KeyBinding: "ctrl-y",
+			OutputType: model.OutputTypeString,
+		},
+		{
+			Name:       "create",
+			KeyBinding: "ctrl-b",
+			OutputType: model.OutputTypeString,
+		},
+		{
+			Name:       "edit",
+			KeyBinding: "ctrl-e",
+			OutputType: model.OutputTypeBidrectional,
+		},
+		{
+			Name:       "delete",
+			KeyBinding: "ctrl-d",
+			OutputType: model.OutputTypeNothing,
+		},
+		{
+			Name:       "refresh",
+			KeyBinding: "ctrl-r",
+			OutputType: model.OutputTypeNothing,
+		},
+	}
+
+	return genericActions, nil
 }
 
 func (d *Kubernetes) ActionDeleteResource(args shared.ActionDeleteResourceArgs) error {
 	return d.deleteResource(context.Background(), args)
 }
 
-func (d *Kubernetes) GetSpecficActionList(resourceType string) ([]shared.SpecificAction, error) {
+func (d *Kubernetes) ActionCreateResource(args shared.ActionCreateResourceArgs) error {
+	return d.createResource(context.Background(), args)
+}
+
+func (d *Kubernetes) ActionUpdateResource(args shared.ActionUpdateResourceArgs) error {
+	return d.updateResource(context.Background(), args)
+}
+
+func (d *Kubernetes) GetSpecficActionList(resourceType string) ([]shared.Action, error) {
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
 		d.logger.Info(fmt.Sprintf("specific action list schema of resource type %s not found, using the default schema", resourceType))
 		t = d.resourceTypeConfigurations["defaults"]
 	}
 
-	arr := make([]shared.SpecificAction, 0)
-	for _, sa := range t.SpecificActions {
-		arr = append(arr, shared.SpecificAction{
-			Name:         sa.Name,
-			KeyBinding:   sa.KeyBinding,
-			ScrrenAction: sa.ScrrenAction,
-			OutputType:   sa.OutputType,
-			ResourceID:   "",
-		})
-	}
-	return arr, nil
+	return t.SpecificActions, nil
 }
 
 func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shared.SpecificActionResult, error) {

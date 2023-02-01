@@ -12,7 +12,7 @@ import (
 	"github.com/sharadregoti/devops/utils/logger"
 )
 
-func (a *Application) websocket(ID string, wdData chan model.WebsocketResponse) error {
+func (a *Application) tableWebsocket(ID string, wdData chan model.WebsocketResponse) error {
 	u := url.URL{Scheme: "ws", Host: a.addr, Path: fmt.Sprintf("/v1/ws/%s", ID)}
 	logger.LogInfo("Connecting to server... %s", u.String())
 
@@ -38,6 +38,20 @@ func (a *Application) websocket(ID string, wdData chan model.WebsocketResponse) 
 	return nil
 }
 
+func (a *Application) actionWebsocket(ID string) (*model.WebsocketReadWriter, error) {
+	u := url.URL{Scheme: "ws", Host: a.addr, Path: fmt.Sprintf("/v1/ws/action/%s/%s", a.connectionID, ID)}
+	logger.LogInfo("Connecting to server... %s", u.String())
+
+	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: Handle websocket closer
+	// defer c.Close()
+
+	return model.NewSocketReadWrite(c), nil
+}
+
 func (a *Application) getInfo() (*model.Info, error) {
 	u := url.URL{Scheme: "http", Host: a.addr, Path: "/v1/info"}
 	res, err := http.Get(u.String())
@@ -57,7 +71,7 @@ func (a *Application) getInfo() (*model.Info, error) {
 }
 
 func (a *Application) sendEvent(fe model.FrontendEvent) (*model.EventResponse, error) {
-	logger.LogDebug("Sending event request...")
+	logger.LogDebug("Sending event request... (%s)", fe.ActionName)
 	data, _ := json.Marshal(fe)
 	u := url.URL{Scheme: "http", Host: a.addr, Path: fmt.Sprintf("/v1/events/%s", a.connectionID)}
 	res, err := http.Post(u.String(), "application/json", strings.NewReader(string(data)))

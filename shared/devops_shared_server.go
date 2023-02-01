@@ -1,7 +1,5 @@
 package shared
 
-import "github.com/sharadregoti/devops/model"
-
 type DevopsHelperServerRPC struct{ Impl DevopsHelper }
 
 func (d *DevopsHelperServerRPC) SendData(args interface{}, resp *error) error {
@@ -27,7 +25,7 @@ func (d *DevopsServerRPC) GetResources(args *GetResourcesArgs, resp *[]interface
 	return err
 }
 
-func (d *DevopsServerRPC) WatchResources(args *string, resp *chan WatchResourceResult) error {
+func (d *DevopsServerRPC) WatchResources(args *string, resp *WatcheResource) error {
 	var err error
 	*resp, err = d.Impl.WatchResources(*args)
 	return err
@@ -39,7 +37,7 @@ func (d *DevopsServerRPC) CloseResourceWatcher(args *string, resp *error) error 
 	return err
 }
 
-func (d *DevopsServerRPC) GetResourceTypeSchema(args *string, resp *model.ResourceTransfomer) error {
+func (d *DevopsServerRPC) GetResourceTypeSchema(args *string, resp *ResourceTransfomer) error {
 	var err error
 	*resp, err = d.Impl.GetResourceTypeSchema(*args)
 	return err
@@ -69,9 +67,9 @@ func (d *DevopsServerRPC) GetDefaultResourceIsolator(args interface{}, resp *str
 	return err
 }
 
-func (d *DevopsServerRPC) GetSupportedActions(args *string, resp *GenericActions) error {
+func (d *DevopsServerRPC) GetSupportedActions(args *string, resp *[]Action) error {
 	var err error
-	*resp, err = d.Impl.GetSupportedActions(*args)
+	*resp, err = d.Impl.GetSupportedActions()
 	return err
 }
 
@@ -81,7 +79,19 @@ func (d *DevopsServerRPC) ActionDeleteResource(args *ActionDeleteResourceArgs, r
 	return err
 }
 
-func (d *DevopsServerRPC) GetSpecficActionList(args *string, resp *[]SpecificAction) error {
+func (d *DevopsServerRPC) ActionCreateResource(args *ActionCreateResourceArgs, resp *error) error {
+	var err error
+	err = d.Impl.ActionCreateResource(*args)
+	return err
+}
+
+func (d *DevopsServerRPC) ActionUpdateResource(args *ActionUpdateResourceArgs, resp *error) error {
+	var err error
+	err = d.Impl.ActionUpdateResource(*args)
+	return err
+}
+
+func (d *DevopsServerRPC) GetSpecficActionList(args *string, resp *[]Action) error {
 	var err error
 	*resp, err = d.Impl.GetSpecficActionList(*args)
 	return err

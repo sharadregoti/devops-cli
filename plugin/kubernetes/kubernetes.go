@@ -11,7 +11,6 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
-	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/shared"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -56,7 +55,7 @@ type Kubernetes struct {
 
 	// Stores mapping of resource types corresponding to a schema defined in file
 	// Key is resource type
-	resourceTypeConfigurations map[string]model.ResourceTransfomer
+	resourceTypeConfigurations map[string]shared.ResourceTransfomer
 
 	// Key is resource type
 	resourceWatcherChanMap map[string]chan shared.WatchResourceResult
@@ -138,7 +137,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	}
 
 	// Read resource configs
-	resourceSchemaTypeMap := map[string]model.ResourceTransfomer{}
+	resourceSchemaTypeMap := map[string]shared.ResourceTransfomer{}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
@@ -160,7 +159,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
 		}
 
-		res := new(model.ResourceTransfomer)
+		res := new(shared.ResourceTransfomer)
 		if err := yaml.Unmarshal(data, res); err != nil {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal table schema data: %w", err)
 		}

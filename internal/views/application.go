@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ const (
 	rootPage        = "root-page"
 	deleteModalPage = "delete-modal-page"
 	viewPage        = "view-page"
+	formPage        = "form-page"
 )
 
 type Application struct {
@@ -34,6 +36,7 @@ type Application struct {
 	ActionView         *Actions
 	modal              *tview.Modal
 	addr               string
+	form               *tview.Form
 
 	connectionID string
 
@@ -56,6 +59,8 @@ func NewApplication(addr string) (*Application, error) {
 	act := NewAction()
 	sa := NewSpecificAction()
 	flash := NewFlashView()
+	form := tview.NewForm()
+	form.SetBorder(true).SetTitle("Form")
 
 	// Global page info flex view
 	global := tview.NewFlex().
@@ -68,7 +73,7 @@ func NewApplication(addr string) (*Application, error) {
 	// Main page
 	rootFlexContainer := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(global, 6, 1, false).
+		AddItem(global, 7, 1, false).
 		AddItem(m.GetView(), 0, 1, true).
 		AddItem(s.GetView(), 0, 0, false) // Default disable
 
@@ -80,6 +85,7 @@ func NewApplication(addr string) (*Application, error) {
 		IsolatorView:       i,
 		PluginView:         p,
 		SpecificActionView: sa,
+		form:               form,
 		// application:        a,
 		page: pa,
 		// Ta:                 ta,
@@ -150,19 +156,20 @@ func NewApplication(addr string) (*Application, error) {
 	pa.AddPage(rootPage, rootFlexContainer, true, true)
 	pa.AddPage(deleteModalPage, modal, true, true)
 	pa.AddPage(viewPage, ta, true, true)
+	pa.AddPage(formPage, form, true, true)
 	pa.SwitchToPage(rootPage)
 
 	ta.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEscape {
-			r.sendEvent(model.FrontendEvent{
-				EventType:  model.InternalAction,
-				ActionName: string(model.Close),
-				// RowIndex:   row,
-			})
+			// r.sendEvent(model.FrontendEvent{
+			// 	EventType:  model.InternalAction,
+			// 	ActionName: string(model.Close),
+			// 	// RowIndex:   row,
+			// })
 			// c <- model.Event{
 			// 	Type: model.Close,
 			// }
-			logger.LogDebug("Sending close event chan")
+			// logger.LogDebug("Sending close event chan")
 			pa.SwitchToPage(rootPage)
 		}
 	})
@@ -201,6 +208,7 @@ func NewApplication(addr string) (*Application, error) {
 			// }
 			return event
 		}
+
 		if event.Key() == tcell.KeyRune {
 			// Specific Action Checks
 			row, _ := m.view.GetSelection()
@@ -208,33 +216,59 @@ func NewApplication(addr string) (*Application, error) {
 				return nil
 			}
 			for _, action := range sa.actions {
+
 				// TODO: Validate key bindings
 				stringToRune := action.KeyBinding[0]
 				if event.Rune() == rune(stringToRune) {
 					resourceType, _ := utils.ParseTableTitle(m.view.GetTitle())
-					res, err := r.sendEvent(model.FrontendEvent{
+
+					fe := model.FrontendEvent{
 						EventType:    model.SpecificAction,
 						ActionName:   action.Name,
-						ResourceType: resourceType,
+						ResourceType: strings.ToLower(resourceType),
 						ResourceName: m.view.GetCell(row, 1).Text,
 						IsolatorName: m.view.GetCell(row, 0).Text,
-					})
+					}
+					if action.Execution.UserInput.Required {
+						go func() {
+							r.ShowForm(action.Execution.UserInput.Args, fe)
+							r.GetApp().Draw()
+						}()
+						return event
+					}
+
+					eRes, err := r.sendEvent(fe)
 					if err != nil {
 						return event
 					}
 
 					if action.OutputType == model.OutputTypeString {
-						stringData := res.Result.(string)
+						stringData := eRes.Result.(string)
 						go func() {
 							r.SetTextAndSwitchView(stringData)
 							r.GetApp().Draw()
 						}()
 					}
-					// c <- model.Event{
-					// 	Type:               string(model.SpecificActionOccured),
-					// 	SpecificActionName: action.Name,
-					// 	ResourceName:       m.view.GetCell(row, 1).Text,
-					// }
+
+					switch action.OutputType {
+					case model.OutputTypeBidrectional, model.OutputTypeStream:
+						logger.LogDebug("Executing action command: %v", eRes.Result.(string))
+						a.Suspend(func() {
+							fmt.Fprintf(os.Stdout, "\033[2J\033[H")
+							logger.LogDebug("Starting suspension:")
+							if err := utils.ExecuteCMD(eRes.Result.(string)); err != nil {
+								logger.LogError("Failed to execute command: %v", err.Error())
+								return
+							}
+							logger.LogDebug("Existing suspension:")
+
+							go a.Draw()
+							logger.LogDebug("Redrawing:")
+						})
+
+						logger.LogDebug("Suspension function ended")
+					}
+
 					return event
 				}
 			}
@@ -249,7 +283,7 @@ func NewApplication(addr string) (*Application, error) {
 		return nil, err
 	}
 
-	if err := r.websocket(infoRes.SessionID, wsdata); err != nil {
+	if err := r.tableWebsocket(infoRes.SessionID, wsdata); err != nil {
 		return nil, err
 	}
 
@@ -277,6 +311,33 @@ func NewApplication(addr string) (*Application, error) {
 func (a *Application) SetTextAndSwitchView(text string) {
 	a.Ta.SetText(text)
 	a.page.SwitchToPage(viewPage)
+}
+
+func (a *Application) ShowForm(formData map[string]interface{}, fe model.FrontendEvent) {
+	a.form.Clear(true)
+
+	for key, value := range formData {
+		a.form.AddInputField(key, value.(string), 0, nil, nil)
+	}
+
+	a.form.AddButton("OK", func() {
+		a.page.SwitchToPage(rootPage)
+		args := map[string]interface{}{}
+		for key := range formData {
+			fi := a.form.GetFormItemByLabel(key)
+			args[key] = fi.(*tview.InputField).GetText()
+		}
+		fe.Args = args
+		_, err := a.sendEvent(fe)
+		if err != nil {
+			return
+		}
+	})
+	a.form.AddButton("Cancel", func() {
+		a.page.SwitchToPage(rootPage)
+	})
+
+	a.page.SwitchToPage(formPage)
 }
 
 func (a *Application) SwitchToMain() {
@@ -359,6 +420,7 @@ func (a *Application) SetKeyboardShortCuts() {
 			}
 
 			// Single digit numbers only
+			// Isolator View
 			for i := range a.IsolatorView.currentKeyMap {
 				numToRune := fmt.Sprintf("%d", i)[0]
 				if event.Rune() == rune(numToRune) {
@@ -382,20 +444,6 @@ func (a *Application) SetKeyboardShortCuts() {
 				}
 			}
 
-			// // Specific Action Checks
-			// row, _ := a.MainView.view.GetSelection()
-			// for _, action := range a.SpecificActionView.actions {
-			// 	// TODO: Validate key bindings
-			// 	stringToRune := action.KeyBinding[0]
-			// 	if event.Rune() == rune(stringToRune) {
-			// 		a.eventChan <- model.Event{
-			// 			Type:               model.SpecificActionOccured,
-			// 			SpecificActionName: action.Name,
-			// 			ResourceName:       a.MainView.view.GetCell(row, 1).Text,
-			// 		}
-			// 	}
-			// }
-
 		case tcell.KeyCtrlR:
 			row, _ := a.MainView.view.GetSelection()
 			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
@@ -409,14 +457,118 @@ func (a *Application) SetKeyboardShortCuts() {
 			if err != nil {
 				return nil
 			}
-			// a.eventChan <- model.Event{
-			// 	Type:         string(model.RefreshResource),
-			// 	RowIndex:     row,
-			// 	ResourceName: a.MainView.view.GetCell(row, 1).Text,
-			// 	ResourceType: strings.ToLower(resourceType),
-			// 	// This will be NA if resource in not isolator specific
-			// 	IsolatorName: a.MainView.view.GetCell(row, 0).Text,
-			// }
+
+		case tcell.KeyCtrlE:
+			row, _ := a.MainView.view.GetSelection()
+			if row == 0 {
+				// Remove header row
+				return event
+			}
+			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
+
+			a.GetApp().Suspend(func() {
+				fmt.Fprintf(os.Stdout, "\033[2J\033[H")
+				logger.LogDebug("Starting suspension:")
+
+				f, err := os.CreateTemp("", "*")
+				if err != nil {
+					logger.LogError("Failed to create temp file: %v", err.Error())
+					return
+				}
+				defer os.Remove(f.Name())
+
+				fileName := f.Name()
+				logger.LogDebug("Temp file name is: %v", fileName)
+
+				res, err := a.sendEvent(model.FrontendEvent{
+					EventType:    model.NormalAction,
+					ActionName:   string(model.ReadResource),
+					ResourceName: a.MainView.view.GetCell(row, 1).Text,
+					ResourceType: strings.ToLower(resourceType),
+					IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+				})
+				if err != nil {
+					return
+				}
+				dd, _ := yaml.Marshal(res.Result)
+
+				_, err = f.WriteString(string(dd))
+				if err != nil {
+					logger.LogError("Failed to write to temp file: %v", err.Error())
+					return
+				}
+				f.Close()
+
+				if err := utils.ExecuteCMD("vi " + fileName); err != nil {
+					logger.LogError("Failed to execute command: %v", err.Error())
+					return
+				}
+
+				index := 0
+				for {
+
+					ff, err := os.ReadFile(fileName)
+					if err != nil {
+						logger.LogError("Failed to open temp file: %v", err.Error())
+						return
+					}
+
+					yamlContent := map[string]interface{}{}
+					if err := yaml.Unmarshal(ff, &yamlContent); err != nil {
+						logger.LogError("Failed to marshal yaml: %v", err.Error())
+						return
+					}
+
+					_, errs := a.sendEvent(model.FrontendEvent{
+						EventType:    model.NormalAction,
+						ActionName:   string(model.EditResource),
+						ResourceName: a.MainView.view.GetCell(row, 1).Text,
+						ResourceType: strings.ToLower(resourceType),
+						IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+						Args:         yamlContent,
+					})
+					if errs == nil {
+						break
+					}
+
+					f, err = os.OpenFile(fileName, os.O_RDWR, 0644)
+					if err != nil {
+						logger.LogError("Failed to open temp file: %v", err.Error())
+						return
+					}
+
+					ff, err = os.ReadFile(fileName)
+					if err != nil {
+						logger.LogError("Failed to open temp file: %v", err.Error())
+						return
+					}
+
+					newContent := ""
+					if index == 0 {
+						newContent = fmt.Sprintf("# %s\n%s", errs.Error(), string(ff))
+						index++
+					} else {
+						index := strings.IndexByte(string(ff), byte('\n'))
+						newContent = fmt.Sprintf("# %s\n%s", errs.Error(), string(ff)[index+1:])
+					}
+					_, err = f.WriteString(newContent)
+					if err != nil {
+						logger.LogError("Failed to write to temp file: %v", err.Error())
+						return
+					}
+					f.Close()
+
+					if err := utils.ExecuteCMD("vi " + fileName); err != nil {
+						logger.LogError("Failed to execute command: %v", err.Error())
+						return
+					}
+
+				}
+				logger.LogDebug("Existing suspension:")
+
+				go a.GetApp().Draw()
+				logger.LogDebug("Redrawing:")
+			})
 
 		case tcell.KeyCtrlY:
 			row, _ := a.MainView.view.GetSelection()
@@ -474,7 +626,6 @@ func (a *Application) SetKeyboardShortCuts() {
 				a.GetApp().Draw()
 			}()
 
-			// case tcell.ctrl
 		case tcell.KeyCtrlA:
 			if a.rootView.GetItemCount() == 2 {
 				a.rootView.AddItem(a.SearchView.GetView(), 2, 1, true)

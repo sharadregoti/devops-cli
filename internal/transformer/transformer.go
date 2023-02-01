@@ -12,6 +12,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/shared"
 	"github.com/tidwall/gjson"
 )
 
@@ -64,7 +65,7 @@ func GetArgs(resource interface{}, args map[string]interface{}) map[string]inter
 	return nestArgs
 }
 
-func GetResourceInTableFormat(logger hclog.Logger, t *model.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
+func GetResourceInTableFormat(logger hclog.Logger, t *shared.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
 	gjson.AddModifier("age", func(json, arg string) string {
 		return getAge(json[1 : len(json)-1])
 	})
@@ -102,7 +103,7 @@ func GetResourceInTableFormat(logger hclog.Logger, t *model.ResourceTransfomer, 
 	return tableResult, nestArgs, nil
 }
 
-func TransformResource(logger hclog.Logger, t *model.ResourceTransfomer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
+func TransformResource(logger hclog.Logger, t *shared.ResourceTransfomer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
 	resultRow := new(model.TableRow)
 	dataRow := make([]string, 0)
 
@@ -224,7 +225,7 @@ func getAge(ts string) string {
 	} else if seconds > 0 {
 		result = fmt.Sprintf("%.0fs", seconds)
 	} else {
-		result = "Yo"
+		result = "NA"
 	}
 
 	return fmt.Sprintf(`"%s"`, result)
