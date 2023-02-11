@@ -1,13 +1,11 @@
 package core
 
 import (
-	"encoding/gob"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-	"time"
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -56,10 +54,10 @@ func checIfPluginExists(rooDir string, c *model.Config) {
 }
 
 func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient, error) {
-	gob.Register(map[string]interface{}{})
-	gob.Register([]interface{}{})
-	gob.Register(make(shared.WatcheResource, 1))
-	gob.Register(time.Time{})
+	// gob.Register(map[string]interface{}{})
+	// gob.Register([]interface{}{})
+	// gob.Register(make(shared.WatcheResource, 1))
+	// gob.Register(time.Time{})
 
 	path := getPluginPath(pluginName, rootDir)
 	logger.Debug("Pluging path", path)
@@ -68,13 +66,15 @@ func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient,
 
 	// We're a host! Start by launching the plugin process.
 	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig: handshakeConfig,
-		Plugins:         pluginMap,
-		Cmd:             exec.Command(path),
-		Logger:          logger,
-		SyncStdout:      writer,
-		SyncStderr:      writer,
+		HandshakeConfig:  handshakeConfig,
+		Plugins:          pluginMap,
+		Cmd:              exec.Command(path),
+		Logger:           logger,
+		SyncStdout:       writer,
+		SyncStderr:       writer,
+		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 	})
+	// TODO: Closer this as well in the Close function
 	// defer client.Kill()
 
 	if client.Exited() {

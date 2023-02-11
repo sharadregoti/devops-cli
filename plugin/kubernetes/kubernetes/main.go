@@ -54,5 +54,6 @@ func main() {
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
 		Logger:          logger,
+		GRPCServer:      plugin.DefaultGRPCServer,
 	})
 }

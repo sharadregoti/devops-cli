@@ -15,27 +15,17 @@ import (
 
 // Server is the object which sets up the server and handles all server operations
 type Server struct {
-	pCtx *core.CurrentPluginContext
-	sm   *core.SessionManager
+	sm *core.SessionManager
 }
 
 func New() (*Server, error) {
-	pCtx, err := core.Start(true)
-	if err != nil {
-		return nil, err
-	}
-
 	sm, err := core.NewSM()
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Close this
-	pCtx.Close()
-
 	return &Server{
-		pCtx: pCtx,
-		sm:   sm,
+		sm: sm,
 	}, nil
 }
 
@@ -47,7 +37,9 @@ type Data struct {
 func (s *Server) routes() http.Handler {
 	router := mux.NewRouter()
 
-	router.Methods(http.MethodGet).Path("/v1/info").HandlerFunc(handlers.HandleInfo(s.sm))
+	router.Methods(http.MethodGet).Path("/v1/config").HandlerFunc(handlers.HandleConfig())
+	router.Methods(http.MethodGet).Path("/v1/auth/{pluginName}").HandlerFunc(handlers.HandleAuth(s.sm))
+	router.Methods(http.MethodGet).Path("/v1/info/{authId}/{contextId}").HandlerFunc(handlers.HandleInfo(s.sm))
 	router.Methods(http.MethodPost).Path("/v1/events/{id}").HandlerFunc(handlers.HandleEvent(s.sm))
 	router.Methods(http.MethodGet).Path("/v1/ws/{id}").HandlerFunc(handlers.HandleWebsocket(s.sm))
 	router.Methods(http.MethodGet).Path("/v1/ws/action/{clientId}/{id}").HandlerFunc(handlers.HandleActionWebsocket(s.sm))

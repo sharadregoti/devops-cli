@@ -5,6 +5,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils/logger"
 )
 
@@ -46,10 +47,10 @@ func (s *SessionManager) GetClient(ID string) (*CurrentPluginContext, error) {
 	return info.c, nil
 }
 
-func (s *SessionManager) AddClient(ID string) error {
+func (s *SessionManager) AddClient(ID, authID, contextID string) error {
 	_, ok := s.m[ID]
 	if !ok {
-		pCtx, err := Start(false)
+		pCtx, err := Start(false, &proto.AuthInfo{IdentifyingName: authID, Name: contextID})
 		if err != nil {
 			return err
 		}

@@ -1,1 +1,9 @@
-watch_kube_config_files: []
+kube_configs:
+  - name: xlr8s-dev-cluster
+    path: "/home/sharad/xebia/dev2.kubeconfig"
+    contexts: 
+      - name: "default"
+        default_namespaces_to_show: 
+          - "default"
+          - "dev-xlr8s"
+        read_only: false

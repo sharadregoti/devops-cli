@@ -11,22 +11,11 @@ import (
 	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/shared"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
 )
-
-// Node represents a node of linked list
-type Node struct {
-	value int
-	next  *Node
-}
-
-// LinkedList represents a linked list
-type LinkedList struct {
-	head *Node
-	len  int
-}
 
 type CurrentPluginContext struct {
 	logger hclog.Logger
@@ -42,7 +31,7 @@ type CurrentPluginContext struct {
 
 	appView *views.Application
 
-	generalInfo         map[string]string
+	authInfo            *proto.AuthInfoResponse
 	defaultIsolator     string
 	defaultIsolatorType string
 	currentIsolator     string
@@ -53,7 +42,7 @@ type CurrentPluginContext struct {
 	// currentResources []interface{}
 	// currentSchema    model.ResourceTransfomer
 
-	currentGenericActions []shared.Action
+	currentGenericActions *proto.GetActionListResponse
 	// currentSpecficActionList []shared.SpecificAction
 
 	tableStack tableStack
@@ -65,6 +54,7 @@ type CurrentPluginContext struct {
 	pc *PluginClient
 
 	actionsToExecute map[string]*actionsToExecute
+	longRunning      map[string]*model.LongRunningInfo
 }
 
 type actionsToExecute struct {
@@ -72,35 +62,54 @@ type actionsToExecute struct {
 	e          model.Event
 }
 
-func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, eventChan chan model.Event, pc *PluginClient) (*CurrentPluginContext, error) {
+func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, eventChan chan model.Event, pc *PluginClient, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
 	// Get known changing infor
-	info, err := p.GetGeneralInfo()
+	logger.Info("initializing plugin context")
+	err := p.Connect(authInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := p.GetAuthInfo()
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
+	logger.Info("GetAuthInfo")
+
 	isolator, err := p.GetDefaultResourceIsolator()
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
+	logger.Info("GetDefaultResourceIsolator")
+
 	resourceTypeList, err := p.GetResourceTypeList()
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
+	logger.Info("GetResourceTypeList")
 
 	defaultIsolatorType, err := p.GetResourceIsolatorType()
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
+	logger.Info("GetResourceIsolatorType")
 
 	actions, err := p.GetSupportedActions()
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
+	logger.Info("GetSupportedActions")
+
+	actions.Actions = append(actions.Actions, &proto.Action{
+		Name:       string(model.ViewLongRunning),
+		KeyBinding: "ctrl-l",
+		OutputType: model.OutputTypeString,
+	})
 
 	// app.SearchView.SetResourceTypes(resourceTypeList)
 	// app.GeneralInfoView.Refresh(info)
@@ -112,7 +121,7 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, 
 		currentPluginName:     pluginName,
 		plugin:                p,
 		appView:               nil,
-		generalInfo:           info,
+		authInfo:              info,
 		defaultIsolatorType:   defaultIsolatorType,
 		currentIsolator:       isolator,
 		defaultIsolator:       isolator,
@@ -154,8 +163,18 @@ func (c *CurrentPluginContext) SendMessage(v model.WebsocketResponse) {
 
 func (c *CurrentPluginContext) Close() error {
 	if c.eventChan != nil {
-		c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}
-		close(c.eventChan)
+		// TODO: Fix this
+		// select {
+		// case c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}:
+		// 	// Value was successfully sent to the channel
+		// 	close(c.eventChan)
+
+		// default:
+		// 	// Channel is closed, do not write to it
+		// }
+
+		// c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}
+		// close(c.eventChan)
 	}
 	if c.dataPipe != nil {
 		close(c.dataPipe)
@@ -169,18 +188,14 @@ func (c *CurrentPluginContext) GetCurrentResourceType() string {
 	return c.getCurrentResource().currentResourceType
 }
 
-func (c *CurrentPluginContext) GetInfo(ID string) *model.Info {
-	plugins := map[string]string{
-		"alt-0": c.currentPluginName,
-	}
-
-	return &model.Info{
-		SessionID:       ID,
-		General:         c.generalInfo,
-		Plugins:         plugins,
-		Actions:         c.currentGenericActions,
+func (c *CurrentPluginContext) GetInfo(ID string) *model.InfoResponse {
+	return &model.InfoResponse{
+		SessionID: ID,
+		// TODO: Add general
+		General:         map[string]string{},
+		Actions:         c.currentGenericActions.Actions,
 		ResourceTypes:   c.supportedResourceTypes,
-		DefaultIsolator: c.defaultIsolator,
+		DefaultIsolator: []string{c.defaultIsolator},
 		IsolatorType:    c.defaultIsolatorType,
 	}
 }
@@ -278,7 +293,8 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 			return
 		}
 	} else {
-		resources, err = c.plugin.GetResources(shared.GetResourcesArgs{ResourceType: rs.currentResourceType, IsolatorID: c.currentIsolator, Args: fnArgs})
+
+		resources, err = c.plugin.GetResources(&proto.GetResourcesArgs{ResourceType: rs.currentResourceType, IsolatorId: c.currentIsolator, Args: utils.GetMap(fnArgs)})
 		if err != nil {
 			common.Error(c.logger, fmt.Sprintf("failed to fetch resources: %v", err))
 			c.appView.SetFlashText(err.Error())
@@ -312,7 +328,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	}
 
 	if rs.currentResourceType == c.defaultIsolatorType {
-		specificActions = append(specificActions, shared.Action{Name: "Use", KeyBinding: "u"})
+		specificActions.Actions = append(specificActions.Actions, &proto.Action{Name: "Use", KeyBinding: "u"})
 	}
 	// c.currentSpecficActionList = specificActions
 
@@ -340,7 +356,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 func (c *CurrentPluginContext) handle(w http.ResponseWriter, req *http.Request) {
 	rs := c.tableStack[c.currentNestedResourceLevel]
-	table, _, err := transformer.GetResourceInTableFormat(c.logger, &rs.currentSchema, rs.currentResources)
+	table, _, err := transformer.GetResourceInTableFormat(c.logger, rs.currentSchema, rs.currentResources)
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
@@ -387,21 +403,21 @@ func SendResponse(ctx context.Context, w http.ResponseWriter, statusCode int, bo
 func (c *CurrentPluginContext) setAppView() {
 
 	rs := c.tableStack[c.currentNestedResourceLevel]
-	tableData, nestArgs, err := transformer.GetResourceInTableFormat(c.logger, &rs.currentSchema, rs.currentResources)
+	tableData, nestArgs, err := transformer.GetResourceInTableFormat(c.logger, rs.currentSchema, rs.currentResources)
 	if err != nil {
 		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
 		return
 	}
 
-	if rs.currentSchema.Nesting.IsNested {
+	if rs.currentSchema.Nesting != nil && rs.currentSchema.Nesting.IsNested {
 		rs.nextResourceArgs = nestArgs
 	}
 
 	c.SendMessage(model.WebsocketResponse{
 		TableName:       utils.GetTableTitle(rs.currentResourceType, len(rs.currentResources)),
 		Data:            tableData,
-		SpecificActions: rs.currentSpecficActionList,
+		SpecificActions: rs.currentSpecficActionList.Actions,
 	})
 	// c.appView.SpecificActionView.RefreshActions(rs.currentSpecficActionList)
 	// c.appView.ActionView.RefreshActions(c.currentGenericActions)

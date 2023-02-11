@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/antonmedv/expr"
-	"github.com/gdamore/tcell/v2"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/shared"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/tidwall/gjson"
 )
 
@@ -65,7 +64,7 @@ func GetArgs(resource interface{}, args map[string]interface{}) map[string]inter
 	return nestArgs
 }
 
-func GetResourceInTableFormat(logger hclog.Logger, t *shared.ResourceTransfomer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
+func GetResourceInTableFormat(logger hclog.Logger, t *proto.ResourceTransformer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
 	gjson.AddModifier("age", func(json, arg string) string {
 		return getAge(json[1 : len(json)-1])
 	})
@@ -80,7 +79,7 @@ func GetResourceInTableFormat(logger hclog.Logger, t *shared.ResourceTransfomer,
 	for _, o := range t.Operations {
 		headerRow.Data = append(headerRow.Data, strings.ToUpper(o.Name))
 	}
-	headerRow.Color = tcell.ColorYellow
+	headerRow.Color = "yellow"
 
 	tableResult = append(tableResult, headerRow)
 	// copy(tableResult[len(tableResult)-1], headerRow)
@@ -95,7 +94,7 @@ func GetResourceInTableFormat(logger hclog.Logger, t *shared.ResourceTransfomer,
 		tableResult = append(tableResult, res)
 		// copy(tableResult[len(tableResult)-1], res)
 
-		if t.Nesting.IsNested {
+		if t.Nesting != nil && t.Nesting.IsNested {
 			nestArgs = append(nestArgs, nestArg)
 		}
 	}
@@ -103,7 +102,7 @@ func GetResourceInTableFormat(logger hclog.Logger, t *shared.ResourceTransfomer,
 	return tableResult, nestArgs, nil
 }
 
-func TransformResource(logger hclog.Logger, t *shared.ResourceTransfomer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
+func TransformResource(logger hclog.Logger, t *proto.ResourceTransformer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
 	resultRow := new(model.TableRow)
 	dataRow := make([]string, 0)
 
@@ -113,22 +112,23 @@ func TransformResource(logger hclog.Logger, t *shared.ResourceTransfomer, data i
 	}
 
 	nestArgs := map[string]interface{}{}
-	if t.Nesting.IsNested {
+	if t.Nesting != nil && t.Nesting.IsNested {
 		for k, v := range t.Nesting.Args {
-			strV, ok := v.(string)
-			if ok {
-				gjsonValue := gjson.Get(string(strData), strV)
-				nestArgs[k] = gjsonValue.Value()
-			} else {
-				nestArgs[k] = v
-			}
+			// strV, ok := v.(string)
+			// if ok {
+			gjsonValue := gjson.Get(string(strData), v)
+			nestArgs[k] = gjsonValue.Value()
+			// }
+			// else {
+			// 	nestArgs[k] = v
+			// }
 		}
 	}
 
 	// Get column names in title case
 	for _, o := range t.Operations {
 		var pathExecResults []interface{} = make([]interface{}, 0)
-		for _, j := range o.JSONPaths {
+		for _, j := range o.JsonPaths {
 			if j.Path != "" {
 				// Evaluate gjson expression
 				value := gjson.Get(string(strData), j.Path).String()
@@ -146,9 +146,11 @@ func TransformResource(logger hclog.Logger, t *shared.ResourceTransfomer, data i
 		dataRow = append(dataRow, fmt.Sprintf(o.OutputFormat, pathExecResults...))
 	}
 	resultRow.Data = dataRow
-	resultRow.Color = tcell.ColorWhite
+	// Default color should be based on the event type happening on the row
+	resultRow.Color = "white"
 
 	for _, s := range t.Styles {
+		gotRes := false
 		for _, c := range s.Conditions {
 			// Evaluate the condition
 			program, err := expr.Compile(c, expr.Env(data))
@@ -170,22 +172,14 @@ func TransformResource(logger hclog.Logger, t *shared.ResourceTransfomer, data i
 			if !result {
 				break
 			}
-			switch s.RowBackgroundColor {
-			case "white":
-				resultRow.Color = tcell.ColorWhite
-			case "red":
-				resultRow.Color = tcell.ColorRed
-			case "yellow":
-				resultRow.Color = tcell.ColorYellow
-			case "blue":
-				resultRow.Color = tcell.ColorBlue
-			case "orange":
-				resultRow.Color = tcell.ColorOrange
-			case "green":
-				resultRow.Color = tcell.ColorGreen
-			case "aqua":
-				resultRow.Color = tcell.ColorAqua
-			}
+
+			resultRow.Color = s.RowBackgroundColor
+			gotRes = true
+			break
+		}
+
+		if gotRes {
+			break
 		}
 	}
 

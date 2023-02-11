@@ -52,7 +52,7 @@ func (a *Application) actionWebsocket(ID string) (*model.WebsocketReadWriter, er
 	return model.NewSocketReadWrite(c), nil
 }
 
-func (a *Application) getInfo() (*model.Info, error) {
+func (a *Application) getInfo() (*model.InfoResponse, error) {
 	u := url.URL{Scheme: "http", Host: a.addr, Path: "/v1/info"}
 	res, err := http.Get(u.String())
 	if err != nil {
@@ -63,7 +63,7 @@ func (a *Application) getInfo() (*model.Info, error) {
 		return nil, a.flashLogError("Get info request failed: received %v status code from server", res.Status)
 	}
 
-	msg := new(model.Info)
+	msg := new(model.InfoResponse)
 	_ = json.NewDecoder(res.Body).Decode(msg)
 
 	return msg, nil

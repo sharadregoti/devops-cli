@@ -51,7 +51,7 @@ func (m *MainView) Refresh(data []*model.TableRow, rowNum int) {
 				continue
 			}
 
-			m.SetCell(r, c, col, cols.Color)
+			m.SetCell(r, c, col, getColor(cols.Color))
 		}
 	}
 	m.GetView().Select(rowNum, 0)
@@ -69,4 +69,34 @@ func (m *MainView) SetCell(x, y int, text string, color tcell.Color) {
 		tview.NewTableCell(text).
 			SetTextColor(color).
 			SetAlign(tview.AlignLeft).SetExpansion(1))
+}
+
+func getColor(color string) tcell.Color {
+
+	switch color {
+	case "darkorange":
+		return tcell.ColorDarkOrange
+	case "gray":
+		return tcell.ColorGray
+	case "white":
+		return tcell.ColorWhite
+	case "lightskyblue":
+		return tcell.ColorLightSkyBlue
+	case "mediumpurple":
+		return tcell.ColorMediumPurple
+	case "red":
+		return tcell.ColorRed
+	case "yellow":
+		return tcell.ColorYellow
+	case "blue":
+		return tcell.ColorBlue
+	case "orange":
+		return tcell.ColorOrange
+	case "green":
+		return tcell.ColorGreen
+	case "aqua":
+		return tcell.ColorAqua
+	default:
+		return tcell.ColorWhite
+	}
 }

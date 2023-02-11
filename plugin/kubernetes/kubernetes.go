@@ -11,13 +11,11 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/shared"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var release bool = false
@@ -45,20 +43,17 @@ type Kubernetes struct {
 	normalClient  *kubernetes.Clientset
 	dynamicClient dynamic.Interface
 
-	config *rest.Config
-
-	// Kube Config Parser
-	clientConfig clientcmdapi.Config
-
 	// Key is resource type, All resources are stored in their plural form
 	resourceTypes resourceTypeList
 
 	// Stores mapping of resource types corresponding to a schema defined in file
 	// Key is resource type
-	resourceTypeConfigurations map[string]shared.ResourceTransfomer
+	resourceTypeConfigurations map[string]*proto.ResourceTransformer
 
 	// Key is resource type
 	resourceWatcherChanMap map[string]chan shared.WatchResourceResult
+
+	kubeCLIconfig *Config
 }
 
 type resourceTypeList map[string]*resourceTypeInfo
@@ -70,6 +65,21 @@ type resourceTypeInfo struct {
 	isNamespaced     bool
 }
 
+type Config struct {
+	KubeConfigs []*KubeConfigs `json:"kube_configs" yaml:"kube_configs"`
+}
+type Contexts struct {
+	Name                    string   `json:"name" yaml:"name"`
+	DefaultNamespacesToShow []string `json:"default_namespaces_to_show" yaml:"default_namespaces_to_show"`
+	ReadOnly                bool     `json:"read_only" yaml:"read_only"`
+	IsDefault               bool     `json:"is_default" yaml:"is_default"`
+}
+type KubeConfigs struct {
+	Name     string      `json:"name" yaml:"name"`
+	Path     string      `json:"path" yaml:"path"`
+	Contexts []*Contexts `json:"contexts" yaml:"contexts"`
+}
+
 func New(logger hclog.Logger) (*Kubernetes, error) {
 
 	// Check if the kubectl command exists
@@ -78,66 +88,8 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 		return &Kubernetes{logger: logger, isOK: fmt.Errorf("kubectl command not found: %w", err)}, err
 	}
 
-	// TODO: Use the normal way don't die here
-	config := ctrl.GetConfigOrDie()
-
-	// Normal client
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to load kube config: %w", err)
-	}
-
-	// Dynamic client
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to load dynamic kube config: %w", err)
-	}
-
-	// Get details from kube-config
-	cc, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{},
-		&clientcmd.ConfigOverrides{}).RawConfig()
-	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to load kubernetes context: %w", err)
-	}
-
-	// List all supported resources
-	resources, err := clientset.Discovery().ServerPreferredResources()
-	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to discover kubernetes resource types: %w", err)
-	}
-
-	// Resource Type List
-	resourceTypeMap := make(resourceTypeList)
-	for _, resource := range resources {
-		for _, r := range resource.APIResources {
-			arr := strings.Split(resource.GroupVersion, "/")
-			group := ""
-			version := ""
-			if len(arr) == 1 {
-				version = arr[0]
-			} else {
-				group = arr[0]
-				version = arr[1]
-			}
-
-			// This is because if you use r.name, it has conflicting values pods for 2 different groups (which overwirte each other)
-			name := strings.ToLower(r.Kind)
-			if !strings.HasSuffix(name, "s") {
-				name = name + "s"
-			}
-
-			resourceTypeMap[name] = &resourceTypeInfo{
-				group:            group,
-				version:          version,
-				resourceTypeName: r.Name,
-				isNamespaced:     r.Namespaced,
-			}
-		}
-	}
-
 	// Read resource configs
-	resourceSchemaTypeMap := map[string]shared.ResourceTransfomer{}
+	resourceSchemaTypeMap := map[string]*proto.ResourceTransformer{}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
@@ -154,27 +106,89 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	}
 
 	for _, f := range files {
+		if f.Name() == "config.yaml" {
+			continue
+		}
+
 		data, err := os.ReadFile(schemaPath + "/" + f.Name())
 		if err != nil {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
 		}
 
-		res := new(shared.ResourceTransfomer)
+		res := new(proto.ResourceTransformer)
 		if err := yaml.Unmarshal(data, res); err != nil {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal table schema data: %w", err)
 		}
-		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = *res
+		logger.Debug("Resource schema", "resource", "schema", res)
+		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = res
+	}
+
+	data, err := os.ReadFile(schemaPath + "/" + "config.yaml")
+	if err != nil {
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read config.yaml file %s: %w", "config.yaml", err)
+	}
+
+	res := new(Config)
+	if err := yaml.Unmarshal(data, res); err != nil {
+		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal config.yaml data: %w", err)
+	}
+
+	defaultFound := false
+	for _, kubeConfig := range res.KubeConfigs {
+		if kubeConfig.Name == "default" {
+			defaultFound = true
+		}
+	}
+
+	if !defaultFound {
+		// Add default config
+		res.KubeConfigs = append(res.KubeConfigs, &KubeConfigs{
+			Name: "default",
+			Path: filepath.Join(homeDir, ".kube", "config")},
+		)
+	}
+
+	// Expand all the contexts
+	for i, kc := range res.KubeConfigs {
+		kubeconfig, err := clientcmd.LoadFromFile(kc.Path)
+		if err != nil {
+			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to build config from flags: %w", err)
+		}
+
+		for k, ctx := range kubeconfig.Contexts {
+
+			isContextFound := false
+			for _, c := range kc.Contexts {
+				if c.Name == k {
+					isContextFound = true
+				}
+			}
+
+			namespaces := []string{"default"}
+			if ctx.Namespace != "" && ctx.Namespace != "default" {
+				namespaces = append(namespaces, ctx.Namespace)
+			}
+
+			if !isContextFound {
+				res.KubeConfigs[i].Contexts = append(res.KubeConfigs[i].Contexts, &Contexts{
+					Name:                    k,
+					IsDefault:               kubeconfig.CurrentContext == k,
+					DefaultNamespacesToShow: namespaces,
+				})
+			}
+
+		}
+
+		for _, c := range res.KubeConfigs[i].Contexts {
+			c.IsDefault = kubeconfig.CurrentContext == c.Name
+		}
 	}
 
 	return &Kubernetes{
 		logger:                     logger,
-		normalClient:               clientset,
-		dynamicClient:              dynamicClient,
-		clientConfig:               cc,
-		config:                     config,
-		resourceTypes:              resourceTypeMap,
 		resourceTypeConfigurations: resourceSchemaTypeMap,
 		resourceWatcherChanMap:     make(map[string]chan shared.WatchResourceResult),
 		activeChans:                make(chan struct{}, 1),
+		kubeCLIconfig:              res,
 	}, nil
 }

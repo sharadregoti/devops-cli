@@ -2,7 +2,7 @@ package model
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/sharadregoti/devops/shared"
+	"github.com/sharadregoti/devops/proto"
 )
 
 type WebsocketReadWriter struct {
@@ -28,13 +28,12 @@ func (srw WebsocketReadWriter) Read(p []byte) (n int, err error) {
 	return len(b), err
 }
 
-type Info struct {
+type InfoResponse struct {
 	SessionID       string            `json:"id" yaml:"id"`
 	General         map[string]string `json:"general" yaml:"general"`
-	Plugins         map[string]string `json:"plugins" yaml:"plugins"`
-	Actions         []shared.Action   `json:"actions" yaml:"actions"`
+	Actions         []*proto.Action   `json:"actions" yaml:"actions"`
 	ResourceTypes   []string          `json:"resourceTypes" yaml:"resourceTypes"`
-	DefaultIsolator string            `json:"defaultIsolator" yaml:"defaultIsolator"`
+	DefaultIsolator []string          `json:"defaultIsolator" yaml:"defaultIsolator"`
 	IsolatorType    string            `json:"isolatorType" yaml:"isolatorType"`
 }
 
@@ -62,7 +61,7 @@ type WebsocketResponse struct {
 	ID              string          `json:"id" yaml:"id"`
 	TableName       string          `json:"name" yaml:"name"`
 	Data            []*TableRow     `json:"data" yaml:"data"`
-	SpecificActions []shared.Action `json:"specificActions" yaml:"specificActions"`
+	SpecificActions []*proto.Action `json:"specificActions" yaml:"specificActions"`
 }
 
 type ErrorResponse struct {
@@ -72,4 +71,28 @@ type ErrorResponse struct {
 type EventResponse struct {
 	ID     string      `json:"id" yaml:"id"`
 	Result interface{} `json:"result" yaml:"result"`
+}
+
+type LongRunningInfo struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	e       *Event
+}
+
+func (lri *LongRunningInfo) SetE(e *Event) {
+	lri.e = e
+}
+
+func (lri *LongRunningInfo) GetE() *Event {
+	return lri.e
+}
+
+type ConfigResponse struct {
+	Plugins []string `json:"plugins" yaml:"plugins"`
+}
+
+type AuthResponse struct {
+	Auths *proto.AuthInfoResponse `json:"auths" yaml:"auths"`
 }

@@ -227,11 +227,19 @@ func NewApplication(addr string) (*Application, error) {
 						ActionName:   action.Name,
 						ResourceType: strings.ToLower(resourceType),
 						ResourceName: m.view.GetCell(row, 1).Text,
-						IsolatorName: m.view.GetCell(row, 0).Text,
+						IsolatorName: r.currentIsolator,
 					}
 					if action.Execution.UserInput.Required {
 						go func() {
-							r.ShowForm(action.Execution.UserInput.Args, fe)
+							fe.ActionName = string(model.SpecificActionResolveArgs)
+							fe.Args = utils.GetMapInterface(action.Execution.UserInput.Args)
+							eRes, err := r.sendEvent(fe)
+							if err != nil {
+								return
+							}
+							// rewrite the action name
+							fe.ActionName = action.Name
+							r.ShowForm(eRes.Result.(map[string]interface{}), fe)
 							r.GetApp().Draw()
 						}()
 						return event
@@ -254,7 +262,7 @@ func NewApplication(addr string) (*Application, error) {
 					case model.OutputTypeBidrectional, model.OutputTypeStream:
 						logger.LogDebug("Executing action command: %v", eRes.Result.(string))
 						a.Suspend(func() {
-							fmt.Fprintf(os.Stdout, "\033[2J\033[H")
+							// fmt.Fprintf(os.Stdout, "\033[2J\033[H")
 							logger.LogDebug("Starting suspension:")
 							if err := utils.ExecuteCMD(eRes.Result.(string)); err != nil {
 								logger.LogError("Failed to execute command: %v", err.Error())
@@ -292,7 +300,7 @@ func NewApplication(addr string) (*Application, error) {
 	r.SearchView.SetResourceTypes(infoRes.ResourceTypes)
 	r.GeneralInfoView.Refresh(infoRes.General)
 	r.IsolatorView.SetDefault(infoRes.DefaultIsolator)
-	r.currentIsolator = infoRes.DefaultIsolator
+	r.currentIsolator = infoRes.DefaultIsolator[0]
 	r.IsolatorView.SetTitle(strings.Title(infoRes.IsolatorType))
 
 	r.SearchView.GetView().Autocomplete().SetDoneFunc(func(key tcell.Key) {
@@ -328,6 +336,7 @@ func (a *Application) ShowForm(formData map[string]interface{}, fe model.Fronten
 			args[key] = fi.(*tview.InputField).GetText()
 		}
 		fe.Args = args
+
 		_, err := a.sendEvent(fe)
 		if err != nil {
 			return
@@ -456,6 +465,23 @@ func (a *Application) SetKeyboardShortCuts() {
 			})
 			if err != nil {
 				return nil
+			}
+		case tcell.KeyCtrlL:
+			row, _ := a.MainView.view.GetSelection()
+			if row == 0 {
+				// Remove header row
+				return event
+			}
+			resourceType, _ := utils.ParseTableTitle(a.MainView.view.GetTitle())
+			_, err := a.sendEvent(model.FrontendEvent{
+				EventType:    model.NormalAction,
+				ActionName:   string(model.ViewLongRunning),
+				ResourceName: a.MainView.view.GetCell(row, 1).Text,
+				ResourceType: strings.ToLower(resourceType),
+				IsolatorName: a.MainView.view.GetCell(row, 0).Text,
+			})
+			if err != nil {
+				return event
 			}
 
 		case tcell.KeyCtrlE:

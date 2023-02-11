@@ -20,7 +20,10 @@ type Event struct {
 	PluginName string
 
 	Args map[string]interface{}
+	// Args map[string]*_struct.Value
 }
+
+// type EventType[T NormalEvent | InternalEvent | SpecficEvent] string
 
 type EventType string
 type NormalEvent string
@@ -48,10 +51,11 @@ const (
 	ReadResource NormalEvent = "read"
 	// DeleteResource event shows a modal promt for deleting a resource
 	// Required fields: ResourceName, ResourceType, IsolatorName
-	DeleteResource             = "delete"
-	UpdateResource             = "update"
-	CreateResource             = "create"
-	EditResource   NormalEvent = "edit"
+	DeleteResource              = "delete"
+	UpdateResource              = "update"
+	CreateResource              = "create"
+	EditResource    NormalEvent = "edit"
+	ViewLongRunning NormalEvent = "view-long-running"
 
 	// ShowModal event shows a modal promt
 	// Required fields: ResourceName, ResourceType, IsolatorName
@@ -72,6 +76,8 @@ const (
 
 	// Specific Action
 	SpecificActionOccured SpecficEvent = "specific-action-occured"
+
+	SpecificActionResolveArgs SpecficEvent = "specific-action-resolve-args"
 
 	ViewNestedResource SpecficEvent = "view-nested-resource"
 

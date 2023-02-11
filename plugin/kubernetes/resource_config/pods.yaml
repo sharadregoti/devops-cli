@@ -18,7 +18,7 @@ operations:
     output_format: ""
   - name: "status"
     json_paths: 
-    - path: "status.phase"
+    - path: "customCalculatedStatus"
     output_format: ""
   - name: "ip"
     json_paths: 
@@ -41,15 +41,27 @@ nesting:
   # - spec.containers
   # - spec.initContainers
 styles:
-  - row_background_color: red
+  - row_background_color: darkorange
     conditions:
-    - 'status.phase != "Running"'
+    - 'customCalculatedStatus == "Pending"'
   - row_background_color: white
     conditions:
-    - 'status.phase == "Running" || status.phase == "Succeeded"'
-  - row_background_color: yellow
+    - 'customCalculatedStatus == "ContainerCreating" || customCalculatedStatus == "PodInitializing"'
+  - row_background_color: aqua
     conditions:
-    - 'status.phase == "Pending"'
+    - 'customCalculatedStatus == "Initialized"'
+  - row_background_color: gray
+    conditions:
+    - 'customCalculatedStatus == "Completed"'
+  - row_background_color: lightskyblue
+    conditions:
+    - 'customCalculatedStatus == "Running"'
+  - row_background_color: mediumpurple
+    conditions:
+    - 'customCalculatedStatus == "Terminating"'
+  - row_background_color: red
+    conditions:
+    - 'true'
 specific_actions:
   - name: "describe"
     key_binding: "d"
@@ -71,13 +83,13 @@ specific_actions:
     key_binding: "f"
     output_type: "nothing"
     execution:
-      cmd: "kubectl port-forward {{.resourceName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}"
+      cmd: "kubectl port-forward {{.resourceName}} -n {{.isolatorName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}"
       is_long_running: true
       user_input:
         required: true
         args:
-          containerPort: "{{(index .resource.spec.containers 0).(index .ports 0).containerPort}}"
-          localPort: "{{.resource.spec.containers[0].ports[0].containerPort}}"
+          containerPort: "{{(index (index .resource.spec.containers 0).ports 0).containerPort}}"
+          localPort: "{{(index (index .resource.spec.containers 0).ports 0).containerPort}}"
           address: "localhost"
       server_input: 
         required: false

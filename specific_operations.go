@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kr/pty"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/shared"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
 	"golang.org/x/term"
@@ -96,7 +96,7 @@ func (c *CurrentPluginContext) PerformSavedAction(id string, rw io.ReadWriter) e
 		return fmt.Errorf("id (%s) does not exists in saved action map", id)
 	}
 
-	fnArgs := shared.SpecificActionArgs{
+	fnArgs := &proto.SpecificActionArgs{
 		ActionName:   a.e.Type,
 		ResourceName: a.e.ResourceName,
 		ResourceType: a.e.ResourceType,
@@ -111,7 +111,7 @@ func (c *CurrentPluginContext) PerformSavedAction(id string, rw io.ReadWriter) e
 		return err
 	}
 
-	cmd := res.Result.(string)
+	cmd := res.Result.AsInterface().(string)
 	logger.LogDebug("Performing specific action got result: %v", cmd)
 
 	if err := cmdExec(cmd, rw); err != nil {
@@ -171,19 +171,11 @@ func (c *CurrentPluginContext) saveAction(e model.Event) (*model.EventResponse, 
 	c.actionsToExecute[id] = &actionsToExecute{e: e}
 	return &model.EventResponse{ID: id}, nil
 }
+func (c *CurrentPluginContext) ExecuteSpecificActionTemplate(a *proto.Action, e model.Event) (string, error) {
 
-func (c *CurrentPluginContext) ExecuteSpecificActionTemplate(a shared.Action, e model.Event) (string, error) {
-	res, err := c.Read(e)
+	params, err := c.getTemplateParams(e)
 	if err != nil {
-		return "", logger.LogError("failed to read resource: %v", err)
-	}
-
-	params := map[string]interface{}{
-		"resourceName": e.ResourceName,
-		"resourceType": e.ResourceType,
-		"isolatorName": e.IsolatorName,
-		"resource":     res,
-		"args":         e.Args,
+		return "", err
 	}
 
 	templateExecutedArgs := map[string]interface{}{}
@@ -209,23 +201,68 @@ func (c *CurrentPluginContext) ExecuteSpecificActionTemplate(a shared.Action, e 
 	return tempRes, nil
 }
 
-func (c *CurrentPluginContext) SpecificAction(a shared.Action, e model.Event) (*model.EventResponse, error) {
-	fnArgs := shared.SpecificActionArgs{
+func (c *CurrentPluginContext) getTemplateParams(e model.Event) (map[string]interface{}, error) {
+	res, err := c.Read(e)
+	if err != nil {
+		return nil, logger.LogError("failed to read resource: %v", err)
+	}
+
+	params := map[string]interface{}{
+		"resourceName": e.ResourceName,
+		"resourceType": e.ResourceType,
+		"isolatorName": e.IsolatorName,
+		"resource":     res,
+		"args":         e.Args,
+	}
+
+	return params, nil
+}
+
+func (c *CurrentPluginContext) ExecuteSpecificActionTemplateArgs(e model.Event) (map[string]interface{}, error) {
+
+	params, err := c.getTemplateParams(e)
+	if err != nil {
+		return nil, err
+	}
+
+	templateExecutedArgs := map[string]interface{}{}
+	for key, value := range e.Args {
+		strValue, ok := value.(string)
+		if ok && strValue != "" {
+			logger.LogDebug("Executing template args having key (%s)", key)
+			res, err := utils.ExecuteTemplate(strValue, params)
+			if err != nil {
+				return nil, logger.LogError("failed to execute template: %v", err)
+			}
+			templateExecutedArgs[key] = res
+			continue
+		}
+		templateExecutedArgs[key] = value
+	}
+
+	return templateExecutedArgs, nil
+}
+
+func (c *CurrentPluginContext) SpecificAction(a *proto.Action, e model.Event) (*model.EventResponse, error) {
+	fnArgs := &proto.SpecificActionArgs{
 		ActionName:   e.Type,
 		ResourceName: e.ResourceName,
 		ResourceType: e.ResourceType,
 		IsolatorName: e.IsolatorName,
-		Args:         e.Args,
+		Args:         utils.GetMap(e.Args),
 	}
 
 	var result interface{}
 	var err error
 	if a.Execution.Cmd != "" {
+		logger.LogDebug("Execting template...")
 		result, err = c.ExecuteSpecificActionTemplate(a, e)
 		if err != nil {
 			return nil, err
 		}
+		logger.LogDebug("Command template result is (%s)", result)
 	} else {
+		logger.LogDebug("Execting actual action...")
 		// Execute actual action
 		res, err := c.plugin.PerformSpecificAction(fnArgs)
 		if err != nil {
@@ -245,7 +282,8 @@ func (c *CurrentPluginContext) SpecificAction(a shared.Action, e model.Event) (*
 
 	case string(model.OutputTypeNothing):
 		if a.Execution.IsLongRunning {
-			err := utils.ExecuteCMDLong(result.(string))
+			// err := utils.ExecuteCMDLong(result.(string))
+			err := c.NewLongRunning(result.(string), &e)
 			if err != nil {
 				return nil, err
 			}
@@ -273,4 +311,59 @@ func (c *CurrentPluginContext) SpecificAction(a shared.Action, e model.Event) (*
 	default:
 		return nil, fmt.Errorf("invalid output type (%v) provided for executing specfic action", a.OutputType)
 	}
+}
+
+func (c *CurrentPluginContext) NewLongRunning(cmdStr string, e *model.Event) error {
+	id := uuid.NewString()
+	lri := &model.LongRunningInfo{
+		ID:      id,
+		Name:    e.Type,
+		Status:  "running",
+		Message: "NA",
+	}
+	lri.SetE(e)
+
+	// Set the command to execute
+	arr := strings.Split(cmdStr, " ")
+
+	// Execute the command
+	cmd := exec.Command(arr[0], arr[1:]...)
+	err := cmd.Run()
+	if err != nil {
+		return logger.LogError("Error while running command: %s", err)
+	}
+
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			lri.Status = "failed"
+			lri.Message = err.Error()
+			logger.LogError("Error while waiting for command to finish: %s", err)
+		}
+	}()
+
+	c.longRunning[id] = lri
+	return nil
+}
+
+func ExecuteCMDLong(cmdStr string) error {
+	// Set the command to execute
+	arr := strings.Split(cmdStr, " ")
+
+	// Execute the command
+	c := exec.Command(arr[0], arr[1:]...)
+	err := c.Run()
+	if err != nil {
+		return logger.LogError("Error while running command: %s", err)
+	}
+
+	go func() {
+		err := c.Wait()
+		if err != nil {
+			logger.LogError("Error while waiting for command to finish: %s", err)
+		}
+
+	}()
+
+	return nil
 }

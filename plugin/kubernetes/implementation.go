@@ -3,15 +3,19 @@ package kubernetes
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/shared"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func (d *Kubernetes) Name() string {
@@ -19,20 +23,87 @@ func (d *Kubernetes) Name() string {
 }
 
 // TODO: test & fix this
-func (d *Kubernetes) StatusOK() error {
+func (d *Kubernetes) Connect(authInfo *proto.AuthInfo) error {
 	if d.isOK != nil {
-		common.Error(d.logger, fmt.Sprintf("failed to load plugin: %v", errors.Unwrap(d.isOK)))
+		return d.isOK
 	}
-	return d.isOK
+
+	kubeConfigPath := ""
+	for _, kc := range d.kubeCLIconfig.KubeConfigs {
+		for _, c := range kc.Contexts {
+			if authInfo.IdentifyingName == kc.Name && authInfo.Name == c.Name {
+				kubeConfigPath = kc.Path
+				break
+			}
+		}
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	if err != nil {
+		return err
+	}
+
+	// Normal client
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load kube config: %w", err)
+	}
+
+	// Dynamic client
+	dynamicClient, err := dynamic.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("failed to load dynamic kube config: %w", err)
+	}
+
+	// List all supported resources
+	resources, err := clientset.Discovery().ServerPreferredResources()
+	if err != nil {
+		return fmt.Errorf("failed to discover kubernetes resource types: %w", err)
+	}
+
+	// Resource Type List
+	resourceTypeMap := make(resourceTypeList)
+	for _, resource := range resources {
+		for _, r := range resource.APIResources {
+			arr := strings.Split(resource.GroupVersion, "/")
+			group := ""
+			version := ""
+			if len(arr) == 1 {
+				version = arr[0]
+			} else {
+				group = arr[0]
+				version = arr[1]
+			}
+
+			// This is because if you use r.name, it has conflicting values pods for 2 different groups (which overwirte each other)
+			name := strings.ToLower(r.Kind)
+			if !strings.HasSuffix(name, "s") {
+				name = name + "s"
+			}
+
+			resourceTypeMap[name] = &resourceTypeInfo{
+				group:            group,
+				version:          version,
+				resourceTypeName: r.Name,
+				isNamespaced:     r.Namespaced,
+			}
+		}
+	}
+
+	d.dynamicClient = dynamicClient
+	d.normalClient = clientset
+	d.resourceTypes = resourceTypeMap
+
+	return nil
 }
 
-func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, error) {
+func (d *Kubernetes) GetResources(args *proto.GetResourcesArgs) ([]interface{}, error) {
 
 	label := ""
 	for k, v := range args.Args {
 		if k == "labels" {
 			selector := labels.NewSelector()
-			for labelKey, labelValue := range v.(map[string]interface{}) {
+			for labelKey, labelValue := range v.GetStructValue().AsMap() {
 				l2, _ := labels.NewRequirement(labelKey, selection.Equals, []string{labelValue.(string)})
 				selector = selector.Add(*l2)
 			}
@@ -45,7 +116,7 @@ func (d *Kubernetes) GetResources(args shared.GetResourcesArgs) ([]interface{}, 
 		return nil, err
 	}
 
-	d.logger.Debug(fmt.Sprintf("Found %v %v resources in %v namespace", len(items), args.ResourceType, args.IsolatorID))
+	d.logger.Debug(fmt.Sprintf("Found %v %v resources in %v namespace", len(items), args.ResourceType, args.IsolatorId))
 	return items, nil
 }
 
@@ -62,36 +133,37 @@ func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 }
 
 // TODO: test & fix this
-func (d *Kubernetes) WatchResources(resourceType string) (shared.WatcheResource, error) {
-	res, ok := d.resourceWatcherChanMap[resourceType]
-	if ok {
-		// Send it
-		d.logger.Debug("Channel already exists for resource", resourceType)
-		return res, nil
-	}
+func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResourceResult, chan struct{}, error) {
+	// res, ok := d.resourceWatcherChanMap[resourceType]
+	// if ok {
+	// 	// Send it
+	// 	d.logger.Debug("Channel already exists for resource", resourceType)
+	// 	return res, nil
+	// }
 
-	d.logger.Debug("Creating a new channel for resource", resourceType)
-	d.lock.Lock()
-	c := make(shared.WatcheResource, 1)
-	d.resourceWatcherChanMap[resourceType] = c
-	d.lock.Unlock()
+	// d.logger.Debug("Creating a new channel for resource", resourceType)
+	// d.lock.Lock()
+	// c := make(shared.WatcheResource, 1)
+	// d.resourceWatcherChanMap[resourceType] = c
+	// d.lock.Unlock()
 
-	go func() {
-		r := d.resourceTypes[resourceType]
-		err := getResourcesDynamically(c, d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
-		if err != nil {
-			common.Error(d.logger, fmt.Sprintf("failed to watch over resource %s: %w", resourceType, err))
-			return
-		}
-	}()
+	// go func() {
+	// 	r := d.resourceTypes[resourceType]
+	// 	err := getResourcesDynamically(c, d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
+	// 	if err != nil {
+	// 		common.Error(d.logger, fmt.Sprintf("failed to watch over resource %s: %w", resourceType, err))
+	// 		return
+	// 	}
+	// }()
 
-	return c, nil
+	return nil, nil, nil
 }
 
-func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (shared.ResourceTransfomer, error) {
+func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (*proto.ResourceTransformer, error) {
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
+
 		return d.resourceTypeConfigurations["defaults"], nil
 	}
 
@@ -109,31 +181,40 @@ func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
 }
 
 // TODO: test & fix this
-func (d *Kubernetes) GetGeneralInfo() (map[string]string, error) {
-	v, err := d.normalClient.ServerVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load server version: %w", err)
+func (d *Kubernetes) GetAuthInfo() (*proto.AuthInfoResponse, error) {
+	authInfo := new(proto.AuthInfoResponse)
+
+	for _, kc := range d.kubeCLIconfig.KubeConfigs {
+		for _, c := range kc.Contexts {
+			authInfo.AuthInfo = append(authInfo.AuthInfo, &proto.AuthInfo{
+				IdentifyingName:  kc.Name,
+				Name:             c.Name,
+				DefaultIsolators: c.DefaultNamespacesToShow,
+				IsDefault:        c.IsDefault,
+				Info:             map[string]string{},
+			})
+		}
 	}
 
-	cc := d.clientConfig.CurrentContext
-	user := ""
+	// v, err := d.normalClient.ServerVersion()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to load server version: %w", err)
+	// }
 
-	context, ok := d.clientConfig.Contexts[cc]
-	if ok {
-		user = context.AuthInfo
-	}
+	// cc := d.clientConfig.CurrentContext
+	// user := ""
 
-	server := ""
-	for _, c := range d.clientConfig.Clusters {
-		server = c.Server
-	}
+	// context, ok := d.clientConfig.Contexts[cc]
+	// if ok {
+	// 	user = context.AuthInfo
+	// }
 
-	return map[string]string{
-		"Context":        cc,
-		"Cluster":        server,
-		"User":           user,
-		"Server Version": v.String(),
-	}, nil
+	// server := ""
+	// for _, c := range d.clientConfig.Clusters {
+	// 	server = c.Server
+	// }
+
+	return authInfo, nil
 }
 
 // TODO: Include plural names as well
@@ -145,166 +226,168 @@ func (d *Kubernetes) GetDefaultResourceIsolator() (string, error) {
 	return "default", nil
 }
 
-func (d *Kubernetes) GetSupportedActions() ([]shared.Action, error) {
-	genericActions := []shared.Action{
-		{
-			Name:       "read",
-			KeyBinding: "ctrl-y",
-			OutputType: model.OutputTypeString,
-		},
-		{
-			Name:       "create",
-			KeyBinding: "ctrl-b",
-			OutputType: model.OutputTypeString,
-		},
-		{
-			Name:       "edit",
-			KeyBinding: "ctrl-e",
-			OutputType: model.OutputTypeBidrectional,
-		},
-		{
-			Name:       "delete",
-			KeyBinding: "ctrl-d",
-			OutputType: model.OutputTypeNothing,
-		},
-		{
-			Name:       "refresh",
-			KeyBinding: "ctrl-r",
-			OutputType: model.OutputTypeNothing,
+func (d *Kubernetes) GetSupportedActions() (*proto.GetActionListResponse, error) {
+	genericActions := &proto.GetActionListResponse{
+		Actions: []*proto.Action{
+			{
+				Name:       "read",
+				KeyBinding: "ctrl-y",
+				OutputType: model.OutputTypeString,
+			},
+			{
+				Name:       "create",
+				KeyBinding: "ctrl-b",
+				OutputType: model.OutputTypeString,
+			},
+			{
+				Name:       "edit",
+				KeyBinding: "ctrl-e",
+				OutputType: model.OutputTypeBidrectional,
+			},
+			{
+				Name:       "delete",
+				KeyBinding: "ctrl-d",
+				OutputType: model.OutputTypeNothing,
+			},
+			{
+				Name:       "refresh",
+				KeyBinding: "ctrl-r",
+				OutputType: model.OutputTypeNothing,
+			},
 		},
 	}
 
 	return genericActions, nil
 }
 
-func (d *Kubernetes) ActionDeleteResource(args shared.ActionDeleteResourceArgs) error {
+func (d *Kubernetes) ActionDeleteResource(args *proto.ActionDeleteResourceArgs) error {
 	return d.deleteResource(context.Background(), args)
 }
 
-func (d *Kubernetes) ActionCreateResource(args shared.ActionCreateResourceArgs) error {
+func (d *Kubernetes) ActionCreateResource(args *proto.ActionCreateResourceArgs) error {
 	return d.createResource(context.Background(), args)
 }
 
-func (d *Kubernetes) ActionUpdateResource(args shared.ActionUpdateResourceArgs) error {
+func (d *Kubernetes) ActionUpdateResource(args *proto.ActionUpdateResourceArgs) error {
 	return d.updateResource(context.Background(), args)
 }
 
-func (d *Kubernetes) GetSpecficActionList(resourceType string) ([]shared.Action, error) {
+func (d *Kubernetes) GetSpecficActionList(resourceType string) (*proto.GetActionListResponse, error) {
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
 		d.logger.Info(fmt.Sprintf("specific action list schema of resource type %s not found, using the default schema", resourceType))
 		t = d.resourceTypeConfigurations["defaults"]
 	}
 
-	return t.SpecificActions, nil
+	return &proto.GetActionListResponse{Actions: t.SpecificActions}, nil
 }
 
-func (d *Kubernetes) PerformSpecificAction(args shared.SpecificActionArgs) (shared.SpecificActionResult, error) {
+func (d *Kubernetes) PerformSpecificAction(args *proto.SpecificActionArgs) (*proto.SpecificActionResult, error) {
 
 	switch args.ActionName {
 
 	case "describe":
-		result, err := d.DescribeResource(args.ResourceType, args.ResourceName, args.IsolatorName)
-		if err != nil {
-			return shared.SpecificActionResult{}, err
-		}
+		// result, err := d.DescribeResource(args.ResourceType, args.ResourceName, args.IsolatorName)
+		// if err != nil {
+		// 	return nil, err
+		// }
 
-		return shared.SpecificActionResult{
-			Result: result,
-			// TODO: Output type should come from an core SDK
-			OutputType: "string",
-		}, nil
+		// return &proto.SpecificActionResult{
+		// 	Result: result,
+		// 	// TODO: Output type should come from an core SDK
+		// 	OutputType: "string",
+		// }, nil
 
 	case "decode-secret":
-		items, err := d.GetResources(shared.GetResourcesArgs{
+		items, err := d.GetResources(&proto.GetResourcesArgs{
 			ResourceName: args.ResourceName,
 			ResourceType: args.ResourceType,
-			IsolatorID:   args.IsolatorName,
+			IsolatorId:   args.IsolatorName,
 		})
 		if err != nil {
-			return shared.SpecificActionResult{}, err
+			return nil, err
 		}
 
-		result, err := d.decodeSecret(items[0])
+		_, err = d.decodeSecret(items[0])
 		if err != nil {
-			return shared.SpecificActionResult{}, err
+			return nil, err
 		}
 
-		return shared.SpecificActionResult{
-			Result: result,
+		return &proto.SpecificActionResult{
+			Result: nil,
 			// TODO: Output type should come from an core SDK
 			OutputType: "string",
 		}, nil
 
 	case "logs":
 
-		containerName := ""
-		if args.ResourceType == "containers" {
-			parentName := args.Args["parentName"]
-			args.ResourceType = "pods"
-			containerName = args.ResourceName
-			args.ResourceName = parentName.(string)
-		}
+		// containerName := ""
+		// if args.ResourceType == "containers" {
+		// 	parentName := args.Args["parentName"]
+		// 	args.ResourceType = "pods"
+		// 	containerName = args.ResourceName
+		// 	args.ResourceName = parentName.AsInterface().(string)
+		// }
 
-		res, err := d.getPodLogs(args.ResourceName, args.IsolatorName, containerName)
-		if err != nil {
-			return shared.SpecificActionResult{}, err
-		}
+		// res, err := d.getPodLogs(args.ResourceName, args.IsolatorName, containerName)
+		// if err != nil {
+		// 	return nil, err
+		// }
 
-		return shared.SpecificActionResult{
-			Result:     res,
-			OutputType: "string",
-		}, nil
+		// return shared.SpecificActionResult{
+		// 	Result:     res,
+		// 	OutputType: "string",
+		// }, nil
 
 	case "shell":
 
-		containerName := ""
-		if args.ResourceType == "containers" {
-			parentName := args.Args["parentName"]
-			args.ResourceType = "pods"
-			containerName = args.ResourceName
-			args.ResourceName = parentName.(string)
-		}
+		// containerName := ""
+		// if args.ResourceType == "containers" {
+		// 	parentName := args.Args["parentName"]
+		// 	args.ResourceType = "pods"
+		// 	containerName = args.ResourceName
+		// 	args.ResourceName = parentName.(string)
+		// }
 
-		res, err := d.execPod(args.ResourceName, args.IsolatorName, containerName)
-		if err != nil {
-			return shared.SpecificActionResult{}, err
-		}
+		// res, err := d.execPod(args.ResourceName, args.IsolatorName, containerName)
+		// if err != nil {
+		// 	return shared.SpecificActionResult{}, err
+		// }
 
-		return shared.SpecificActionResult{
-			Result:     res,
-			OutputType: "string",
-		}, nil
+		// return shared.SpecificActionResult{
+		// 	Result:     res,
+		// 	OutputType: "string",
+		// }, nil
 
 	case "port-forward":
 
-		res, err := d.portForward(args.ResourceName, args.IsolatorName, args.Args)
-		if err != nil {
-			return shared.SpecificActionResult{}, err
-		}
+		// res, err := d.portForward(args.ResourceName, args.IsolatorName, args.Args)
+		// if err != nil {
+		// 	return shared.SpecificActionResult{}, err
+		// }
 
-		return shared.SpecificActionResult{
-			Result:     res,
-			OutputType: "string",
-		}, nil
+		// return shared.SpecificActionResult{
+		// 	Result:     res,
+		// 	OutputType: "string",
+		// }, nil
 
 	case "view-pods":
-		res, err := d.getPods(context.Background(), args.IsolatorName, args.ResourceName, args.ResourceType)
-		if err != nil {
-			return shared.SpecificActionResult{}, err
-		}
-		return shared.SpecificActionResult{
-			Result: res,
-			// TODO: Output type should come from an core SDK
-			OutputType: "invoke-event",
-		}, nil
+		// res, err := d.getPods(context.Background(), args.IsolatorName, args.ResourceName, args.ResourceType)
+		// if err != nil {
+		// 	return shared.SpecificActionResult{}, err
+		// }
+		// return shared.SpecificActionResult{
+		// 	Result: res,
+		// 	// TODO: Output type should come from an core SDK
+		// 	OutputType: "invoke-event",
+		// }, nil
 
 	case "close":
-		d.activeChans <- struct{}{}
-		return shared.SpecificActionResult{}, nil
+		// d.activeChans <- struct{}{}
+		// return shared.SpecificActionResult{}, nil
 	}
 
-	return shared.SpecificActionResult{}, nil
+	return nil, nil
 }
 
 func (d *Kubernetes) decodeSecret(rawData interface{}) (string, error) {

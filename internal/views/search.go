@@ -14,7 +14,9 @@ type SearchView struct {
 
 func NewSearchView() *SearchView {
 	searchBox := tview.NewInputField()
-	searchBox.SetFieldBackgroundColor(tcell.Color100)
+	searchBox.SetFieldBackgroundColor(searchBox.GetBackgroundColor())
+
+	// searchBox.color
 	searchBox.Autocomplete().SetDoneFunc(func(key tcell.Key) {
 		// c <- model.Event{
 		// 	Type:         string(model.ResourceTypeChanged),
@@ -38,7 +40,12 @@ func (s *SearchView) SetResourceTypes(arr []string) {
 			return
 		}
 
-		matches := fuzzy.Find(strings.ToLower(currentText), arr)
+		matches := fuzzy.Matches{}
+		if strings.HasPrefix(currentText, "@") {
+			matches = fuzzy.Find(strings.ToLower(currentText), []string{"@default", "@xlr8s-dev"})
+		} else {
+			matches = fuzzy.Find(strings.ToLower(currentText), arr)
+		}
 
 		for _, v := range matches {
 			entries = append(entries, v.Str)

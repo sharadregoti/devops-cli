@@ -16,6 +16,61 @@ import (
 	"github.com/sharadregoti/devops/utils/logger"
 )
 
+// HandleConfig gives info
+// @Summary      HandleConfig endpoint
+// @ID           HandleConfig
+// @Description  HandleConfig endpoint
+// @Accept       json
+// @Produce      json
+// @Success      200 {object} model.Info true
+// @Failure      400 {object} model.ErrorResponse true
+// @Failure      404 {object} model.ErrorResponse true
+// @Failure      500 {object} model.ErrorResponse true
+// @Router       /v1/info [get]
+func HandleConfig() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
+		defer cancel()
+
+		p, err := core.ListPlugins()
+		if err != nil {
+			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+			return
+		}
+
+		_ = utils.SendResponse(ctx, w, http.StatusOK, model.ConfigResponse{Plugins: p})
+	}
+}
+
+// HandleAuth gives info
+// @Summary      HandleAuth endpoint
+// @ID           HandleAuth
+// @Description  HandleAuth endpoint
+// @Accept       json
+// @Produce      json
+// @Success      200 {object} model.Info true
+// @Failure      400 {object} model.ErrorResponse true
+// @Failure      404 {object} model.ErrorResponse true
+// @Failure      500 {object} model.ErrorResponse true
+// @Router       /v1/info [get]
+func HandleAuth(sm *core.SessionManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
+		defer cancel()
+
+		params := mux.Vars(r)
+		pluginName := params["pluginName"]
+
+		auths, err := core.InitAndGetAuthInfo(pluginName)
+		if err != nil {
+			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+			return
+		}
+
+		_ = utils.SendResponse(ctx, w, http.StatusOK, model.AuthResponse{Auths: auths})
+	}
+}
+
 // HandleInfo gives info
 // @Summary      HandleInfo endpoint
 // @ID           HandleInfo
@@ -32,8 +87,12 @@ func HandleInfo(sm *core.SessionManager) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
 		defer cancel()
 
+		params := mux.Vars(r)
+		authID := params["authId"]
+		contextID := params["contextId"]
+
 		ID := fmt.Sprintf("%d", sm.SessionCount()+1)
-		if err := sm.AddClient(ID); err != nil {
+		if err := sm.AddClient(ID, authID, contextID); err != nil {
 			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
 			return
 		}
@@ -150,6 +209,12 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 
+			case model.ViewLongRunning:
+				result := pCtx.GetLongRunning(e)
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: result})
+				return
+
 			default:
 				_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, fmt.Errorf("unknown normal event  %v provided", req.EventType))
 				return
@@ -180,13 +245,25 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 				return
 			}
 		case model.SpecificAction:
+
+			if req.ActionName == string(model.SpecificActionResolveArgs) {
+				res, err := pCtx.ExecuteSpecificActionTemplateArgs(e)
+				if err != nil {
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
+					return
+				}
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: res})
+
+			}
+
 			actions, err := pCtx.GetSpecficActionList(e)
 			if err != nil {
 				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 			}
 
-			for _, a := range actions {
+			for _, a := range actions.Actions {
 				if a.Name == req.ActionName {
 					logger.LogDebug("Specific action match found")
 
@@ -235,6 +312,8 @@ func HandleWebsocket(sm *core.SessionManager) http.HandlerFunc {
 
 		params := mux.Vars(r)
 		ID := params["id"]
+		// authID := params["authId"]
+		// contextID := params["contextId"]
 
 		pCtx, err := sm.GetClient(ID)
 		if err != nil {

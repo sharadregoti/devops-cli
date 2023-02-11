@@ -49,11 +49,10 @@ func (g *IsolatorView) SetTitle(data string) {
 	g.view.SetTitle(data)
 }
 
-func (g *IsolatorView) SetDefault(data string) {
+func (g *IsolatorView) SetDefault(data []string) {
 	g.view.Clear()
-	temp := []string{data}
-	g.currentKeyMap = temp
-	g.view.SetText(createKeyValuePairsIsolator(temp))
+	g.currentKeyMap = data
+	g.view.SetText(createKeyValuePairsIsolator(data))
 }
 
 func (g *IsolatorView) AddAndRefreshView(isolatorName string) {

@@ -11,6 +11,7 @@ import (
 	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils/logger"
 )
 
@@ -35,7 +36,7 @@ func getPluginPath(name, devopsDir string) string {
 	return fmt.Sprintf("../../plugin/%s/%s/%s", name, name, name)
 }
 
-func Start(isTest bool) (*CurrentPluginContext, error) {
+func ListPlugins() ([]string, error) {
 	// Init plugins
 	devopsDir := model.InitCoreDirectory()
 
@@ -44,7 +45,52 @@ func Start(isTest bool) (*CurrentPluginContext, error) {
 
 	checIfPluginExists(devopsDir, c)
 
-	loggero, loggerf := logger.Loggero, logger.Loggerf
+	if len(c.Plugins) == 0 {
+		return nil, fmt.Errorf("no plugins were specified in the configuration, Exitting...")
+	}
+
+	// TODO: Throw error if plugin with same name found...
+	plugins := make([]string, 0)
+	for _, p := range c.Plugins {
+		plugins = append(plugins, p.Name)
+	}
+
+	return plugins, nil
+}
+
+func InitAndGetAuthInfo(pluginName string) (*proto.AuthInfoResponse, error) {
+	devopsDir := model.InitCoreDirectory()
+
+	pc, err := loadPlugin(logger.Loggerf, pluginName, devopsDir)
+	if err != nil {
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+
+	kp, err := pc.GetPlugin(pluginName)
+	if err != nil {
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+
+	auths, err := kp.GetAuthInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return auths, nil
+}
+
+func Start(isTest bool, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
+	// Init plugins
+	devopsDir := model.InitCoreDirectory()
+
+	// Load config
+	c := model.LoadConfig(devopsDir)
+
+	checIfPluginExists(devopsDir, c)
+
+	_, loggerf := logger.Loggero, logger.Loggerf
 	if len(c.Plugins) == 0 {
 		log.Fatal("No plugins were specified in the configuration, Exitting...")
 	}
@@ -65,17 +111,19 @@ func Start(isTest bool) (*CurrentPluginContext, error) {
 		os.Exit(1)
 	}
 
-	if err := kp.StatusOK(); err != nil {
-		common.Error(loggero, fmt.Sprintf("failed to load plugin: %v", err))
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
-	}
+	// authInfos, err := kp.GetAuthInfo()
+
+	// if err := kp.StatusOK(); err != nil {
+	// 	common.Error(loggero, fmt.Sprintf("failed to load plugin: %v", err))
+	// 	time.Sleep(5 * time.Second)
+	// 	os.Exit(1)
+	// }
 
 	eventChan := make(chan model.Event, 1)
 	// defer close(eventChan)
 
 	// Initiate global plugin contexts
-	pCtx, err := initPluginContext(loggerf, kp, initialPlugin.Name, eventChan, pc)
+	pCtx, err := initPluginContext(loggerf, kp, initialPlugin.Name, eventChan, pc, authInfo)
 	if err != nil {
 		time.Sleep(5 * time.Second)
 		os.Exit(1)

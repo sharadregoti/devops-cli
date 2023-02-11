@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/shared"
 )
 
@@ -35,8 +36,8 @@ type resourceStack struct {
 	nextResourceArgs         []map[string]interface{}
 	currentResourceType      string
 	currentResources         []interface{}
-	currentSchema            shared.ResourceTransfomer
-	currentSpecficActionList []shared.Action
+	currentSchema            *proto.ResourceTransformer
+	currentSpecficActionList *proto.GetActionListResponse
 }
 
 type nestedResurce struct {
@@ -44,6 +45,6 @@ type nestedResurce struct {
 	currentIsolator          string
 	currentResourceType      string
 	currentResources         []interface{}
-	currentSchema            shared.ResourceTransfomer
+	currentSchema            shared.ResourceTransformer
 	currentSpecficActionList []shared.Action
 }

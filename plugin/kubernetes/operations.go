@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/sharadregoti/devops/common"
+	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/shared"
 	"github.com/tidwall/gjson"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -17,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.Interface, ctx context.Context, group string, version string, resource string, namespace string) error {
@@ -178,7 +182,7 @@ func (d *Kubernetes) DescribeResource(resourceType, resourceName, namespace stri
 	return string(output), nil
 }
 
-func (d *Kubernetes) createResource(ctx context.Context, args shared.ActionCreateResourceArgs) error {
+func (d *Kubernetes) createResource(ctx context.Context, args *proto.ActionCreateResourceArgs) error {
 	rt, ok := d.resourceTypes[args.ResourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
@@ -191,7 +195,7 @@ func (d *Kubernetes) createResource(ctx context.Context, args shared.ActionCreat
 		Resource: rt.resourceTypeName,
 	}
 
-	objMap, ok := args.Data.(map[string]interface{})
+	objMap, ok := args.Data.AsInterface().(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("could not convert data to map[string]interface{}")
 	}
@@ -213,7 +217,7 @@ func (d *Kubernetes) createResource(ctx context.Context, args shared.ActionCreat
 	return err
 }
 
-func (d *Kubernetes) updateResource(ctx context.Context, args shared.ActionUpdateResourceArgs) error {
+func (d *Kubernetes) updateResource(ctx context.Context, args *proto.ActionUpdateResourceArgs) error {
 	rt, ok := d.resourceTypes[args.ResourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
@@ -226,7 +230,7 @@ func (d *Kubernetes) updateResource(ctx context.Context, args shared.ActionUpdat
 		Resource: rt.resourceTypeName,
 	}
 
-	objMap, ok := args.Data.(map[string]interface{})
+	objMap, ok := args.Data.AsInterface().(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("could not convert data to map[string]interface{}")
 	}
@@ -248,7 +252,7 @@ func (d *Kubernetes) updateResource(ctx context.Context, args shared.ActionUpdat
 	return err
 }
 
-func (d *Kubernetes) deleteResource(ctx context.Context, args shared.ActionDeleteResourceArgs) error {
+func (d *Kubernetes) deleteResource(ctx context.Context, args *proto.ActionDeleteResourceArgs) error {
 	rt, ok := d.resourceTypes[args.ResourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
@@ -288,10 +292,10 @@ func (d *Kubernetes) getContainers(ctx context.Context, namespace string, resour
 }
 
 func (d *Kubernetes) getPods(ctx context.Context, namespace string, resourceName, resourceType string) ([]interface{}, error) {
-	arr, err := d.listResources(ctx, shared.GetResourcesArgs{
+	arr, err := d.listResources(ctx, &proto.GetResourcesArgs{
 		ResourceName: resourceName,
 		ResourceType: resourceType,
-		IsolatorID:   namespace,
+		IsolatorId:   namespace,
 	}, "")
 	if err != nil {
 		return nil, err
@@ -324,10 +328,10 @@ func (d *Kubernetes) getPods(ctx context.Context, namespace string, resourceName
 		selector = selector.Add(*l2)
 	}
 
-	resultArr, err := d.listResources(ctx, shared.GetResourcesArgs{
+	resultArr, err := d.listResources(ctx, &proto.GetResourcesArgs{
 		ResourceName: "",
 		ResourceType: "pods",
-		IsolatorID:   namespace,
+		IsolatorId:   namespace,
 	}, selector.String())
 	// list, err := d.normalClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 	// 	LabelSelector: selector.String(),
@@ -345,7 +349,7 @@ func (d *Kubernetes) getPods(ctx context.Context, namespace string, resourceName
 	return resultArr, nil
 }
 
-func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResourcesArgs, label string) ([]interface{}, error) {
+func (d *Kubernetes) listResources(ctx context.Context, args *proto.GetResourcesArgs, label string) ([]interface{}, error) {
 	rt, ok := d.resourceTypes[args.ResourceType]
 	if !ok {
 		d.logger.Debug(fmt.Sprintf("Could not find resource type %s in current kubernetes context", args.ResourceType))
@@ -363,7 +367,7 @@ func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResources
 
 	if args.ResourceName != "" {
 		// Single get
-		uData, err := d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorID).Get(ctx, args.ResourceName, metav1.GetOptions{})
+		uData, err := d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorId).Get(ctx, args.ResourceName, metav1.GetOptions{})
 		if err != nil {
 			common.Error(d.logger, fmt.Sprintf("failed to get dynamic resource: %v", err))
 			return nil, err
@@ -372,7 +376,7 @@ func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResources
 	} else {
 		// List
 		if rt.isNamespaced {
-			list, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorID).List(ctx, metav1.ListOptions{LabelSelector: label})
+			list, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorId).List(ctx, metav1.ListOptions{LabelSelector: label})
 		} else {
 			list, err = d.dynamicClient.Resource(resourceId).List(ctx, metav1.ListOptions{LabelSelector: label})
 		}
@@ -383,6 +387,7 @@ func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResources
 
 	result := make([]interface{}, 0)
 	for _, item := range list.Items {
+
 		var rawJson map[string]interface{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &rawJson)
 		if err != nil {
@@ -392,8 +397,113 @@ func (d *Kubernetes) listResources(ctx context.Context, args shared.GetResources
 		meta := rawJson["metadata"].(map[string]interface{})
 		delete(meta, "managedFields")
 		rawJson["metadata"] = meta
+		if args.ResourceType == "pods" {
+			f, err := json.Marshal(rawJson)
+			if err != nil {
+				common.Error(d.logger, fmt.Sprintf("failed to unstructure resource: %v", err))
+				return nil, err
+			}
+
+			obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(f, nil, nil)
+			if err != nil {
+				common.Error(d.logger, fmt.Sprintf("failed to unstructure resource: %v", err))
+				return nil, err
+			}
+			// var po v1.Pod
+			// err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &rawJson)
+			// if err != nil {
+			// 	common.Error(d.logger, fmt.Sprintf("failed to unstructure resource: %v", err))
+			// 	return nil, err
+			// }
+			// rawJson["customCalculatedStatus"] = Phase(&po)
+			rawJson["customCalculatedStatus"] = Phase(obj.(*v1.Pod))
+		}
 		result = append(result, rawJson)
 	}
 
 	return result, nil
+}
+
+// Phase reports the given pod phase.
+func Phase(po *v1.Pod) string {
+	status := string(po.Status.Phase)
+	if po.Status.Reason != "" {
+		if po.DeletionTimestamp != nil && po.Status.Reason == "NodeLost" {
+			return "Unknown"
+		}
+		status = po.Status.Reason
+	}
+
+	status, ok := initContainerPhase(po.Status, len(po.Spec.InitContainers), status)
+	if ok {
+		return status
+	}
+
+	status, ok = containerPhase(po.Status, status)
+	if ok && status == "Completed" {
+		status = string(v1.PodRunning)
+	}
+	if po.DeletionTimestamp == nil {
+		return status
+	}
+
+	return "Terminating"
+}
+
+func containerPhase(st v1.PodStatus, status string) (string, bool) {
+	var running bool
+	for i := len(st.ContainerStatuses) - 1; i >= 0; i-- {
+		cs := st.ContainerStatuses[i]
+		switch {
+		case cs.State.Waiting != nil && cs.State.Waiting.Reason != "":
+			status = cs.State.Waiting.Reason
+		case cs.State.Terminated != nil && cs.State.Terminated.Reason != "":
+			status = cs.State.Terminated.Reason
+		case cs.State.Terminated != nil:
+			if cs.State.Terminated.Signal != 0 {
+				status = "Signal:" + strconv.Itoa(int(cs.State.Terminated.Signal))
+			} else {
+				status = "ExitCode:" + strconv.Itoa(int(cs.State.Terminated.ExitCode))
+			}
+		case cs.Ready && cs.State.Running != nil:
+			running = true
+		}
+	}
+
+	return status, running
+}
+
+func initContainerPhase(st v1.PodStatus, initCount int, status string) (string, bool) {
+	for i, cs := range st.InitContainerStatuses {
+		s := checkContainerStatus(cs, i, initCount)
+		if s == "" {
+			continue
+		}
+		return s, true
+	}
+
+	return status, false
+}
+
+// ----------------------------------------------------------------------------
+// Helpers..
+
+func checkContainerStatus(cs v1.ContainerStatus, i, initCount int) string {
+	switch {
+	case cs.State.Terminated != nil:
+		if cs.State.Terminated.ExitCode == 0 {
+			return ""
+		}
+		if cs.State.Terminated.Reason != "" {
+			return "Init:" + cs.State.Terminated.Reason
+		}
+		if cs.State.Terminated.Signal != 0 {
+			return "Init:Signal:" + strconv.Itoa(int(cs.State.Terminated.Signal))
+		}
+		return "Init:ExitCode:" + strconv.Itoa(int(cs.State.Terminated.ExitCode))
+	case cs.State.Waiting != nil && cs.State.Waiting.Reason != "" && cs.State.Waiting.Reason != "PodInitializing":
+		return "Init:" + cs.State.Waiting.Reason
+	default:
+		return "Init:" + strconv.Itoa(i) + "/" + strconv.Itoa(initCount)
+	}
 }

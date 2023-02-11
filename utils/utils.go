@@ -31,7 +31,7 @@ func ExecuteCMDGetOutput(cmdStr string) (string, error) {
 	// Execute the command
 	output, err := exec.Command(arr[0], arr[1:]...).Output()
 	if err != nil {
-		return "", logger.LogError("Error while executing command: %s", err)
+		return "", logger.LogError("Error while executing command %v: %s", arr, err)
 	}
 
 	return string(output), nil
@@ -104,6 +104,7 @@ func ExecuteCMD(cmdStr string) error {
 		logger.LogDebug("Closing stdin:")
 	}()
 
+	// TODO: Errors made by commands are not being handled
 	_, _ = io.Copy(os.Stdout, ptmx)
 	logger.LogDebug("Closing stdout:")
 	return nil
