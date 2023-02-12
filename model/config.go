@@ -10,11 +10,16 @@ import (
 )
 
 type Config struct {
-	Plugins []*Plugin `yaml:"plugins"`
+	Server  *Server   `json:"server" yaml:"server"`
+	Plugins []*Plugin `json:"plugins" yaml:"plugins"`
+}
+
+type Server struct {
+	Address string `json:"address" yaml:"address"`
 }
 
 type Plugin struct {
-	Name string `yaml:"name"`
+	Name string `json:"name" yaml:"name"`
 }
 
 // Creates .devops directory if it does not exists

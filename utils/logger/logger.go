@@ -19,7 +19,12 @@ var fileWriter io.Writer
 func init() {
 	// Init plugins
 	devopsDir := model.InitCoreDirectory()
-	file := getCoreLogFile(devopsDir)
+	filePath := filepath.Join(devopsDir, "devops.log")
+	file, err := getCoreLogFile(filePath)
+	if err != nil {
+		log.Fatal("Error while creating log file", err)
+		return
+	}
 
 	fileWriter = file
 	Loggero, Loggerf = createLoggers(file)
@@ -30,7 +35,12 @@ func init() {
 
 func InitClientLogging() {
 	devopsDir := model.InitCoreDirectory()
-	file := getClientCoreLogFile(devopsDir)
+	filePath := filepath.Join(devopsDir, "devops-tui.log")
+	file, err := getCoreLogFile(filePath)
+	if err != nil {
+		log.Fatal("Error while creating log file", err)
+		return
+	}
 
 	fileWriter = file
 	Loggero, Loggerf = createLoggers(file)
@@ -56,56 +66,23 @@ func GetFileWriter() io.Writer {
 	return fileWriter
 }
 
-func getCoreLogFile(devopsDir string) *os.File {
-	// Create the ".devops" subdirectory if it doesn't exist
-	filePath := filepath.Join(devopsDir, "devops.log")
-	fmt.Println("Logfile can be found at:", filePath)
-	var file *os.File
-	var err error
-	// if _, err := os.Stat(filePath); os.IsNotExist(err) {
-	file, err = os.Create(filePath)
-	if err != nil {
-		log.Fatal("Cannot create devops.log file", err)
+func getCoreLogFile(filePath string) (*os.File, error) {
+	// Check if the file exists
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		// If file does not exist, create it
+		file, err := os.Create(filePath)
+		if err != nil {
+			return nil, err
+		}
+		return file, nil
 	}
-	// TODO: Fix this
-	return file
-	// } else if !os.IsExist(err) && err != nil {
-	// 	log.Fatal("Cannot get stats of devops.log fiel", err)
-	// }
-
-	// file, err = os.Open(filePath)
-	// if err != nil {
-	// 	log.Fatal("Cannot open devops.log file", err)
-	// }
-	// fmt.Println(filePath)
-	// return file
-	// defer file.Close()
-}
-
-func getClientCoreLogFile(devopsDir string) *os.File {
-	// Create the ".devops" subdirectory if it doesn't exist
-	filePath := filepath.Join(devopsDir, "devops-client.log")
-	fmt.Println("Logfile can be found at:", filePath)
-	var file *os.File
-	var err error
-	// if _, err := os.Stat(filePath); os.IsNotExist(err) {
-	file, err = os.Create(filePath)
+	// If file exists, open it
+	file, err := os.OpenFile(filePath, os.O_RDWR, 0644)
 	if err != nil {
-		log.Fatal("Cannot create devops.log file", err)
+		return nil, err
 	}
-	// TODO: Fix this
-	return file
-	// } else if !os.IsExist(err) && err != nil {
-	// 	log.Fatal("Cannot get stats of devops.log fiel", err)
-	// }
-
-	// file, err = os.Open(filePath)
-	// if err != nil {
-	// 	log.Fatal("Cannot open devops.log file", err)
-	// }
-	// fmt.Println(filePath)
-	// return file
-	// defer file.Close()
+	return file, nil
 }
 
 func LogInfo(msg string, args ...interface{}) {

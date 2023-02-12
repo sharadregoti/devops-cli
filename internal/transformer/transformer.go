@@ -130,7 +130,8 @@ func TransformResource(t *proto.ResourceTransformer, data interface{}) (*model.T
 		for _, j := range o.JsonPaths {
 			if j.Path != "" {
 				// Evaluate gjson expression
-				value := gjson.Get(string(strData), j.Path).String()
+				tp := string(strData)
+				value := gjson.Get(tp, j.Path).String()
 				if value == "" {
 					value = "NA"
 				}

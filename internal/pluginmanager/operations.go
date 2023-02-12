@@ -3,58 +3,41 @@ package pluginmanager
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
-	"github.com/sharadregoti/devops/common"
-	"github.com/sharadregoti/devops/internal/tui"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils/logger"
 )
 
-// Updating VS Code Server to version 1ad8d514439d5077d2b0b7ee64d2ce82a9308e5a
-// Removing previous installation...
-// Installing VS Code Server for x64 (1ad8d514439d5077d2b0b7ee64d2ce82a9308e5a)
-// Downloading:  80%
+// func ListPlugins() ([]string, error) {
+// 	// Init plugins
+// 	devopsDir := model.InitCoreDirectory()
 
-// var release bool = false
+// 	// Load config
+// 	c := model.LoadConfig(devopsDir)
 
-func getPluginPath(name, devopsDir string) string {
-	if common.Release {
-		return fmt.Sprintf("%s/plugins/%s/%s", devopsDir, name, name)
-	}
-	return fmt.Sprintf("../../plugins/%s/%s/%s", name, name, name)
-}
+// 	checIfPluginExists(devopsDir, c)
 
-func ListPlugins() ([]string, error) {
-	// Init plugins
-	devopsDir := model.InitCoreDirectory()
+// 	if len(c.Plugins) == 0 {
+// 		return nil, fmt.Errorf("no plugins were specified in the configuration, Exitting...")
+// 	}
 
-	// Load config
-	c := model.LoadConfig(devopsDir)
+// 	// TODO: Throw error if plugin with same name found...
+// 	plugins := make([]string, 0)
+// 	for _, p := range c.Plugins {
+// 		plugins = append(plugins, p.Name)
+// 	}
 
-	checIfPluginExists(devopsDir, c)
-
-	if len(c.Plugins) == 0 {
-		return nil, fmt.Errorf("no plugins were specified in the configuration, Exitting...")
-	}
-
-	// TODO: Throw error if plugin with same name found...
-	plugins := make([]string, 0)
-	for _, p := range c.Plugins {
-		plugins = append(plugins, p.Name)
-	}
-
-	return plugins, nil
-}
+// 	return plugins, nil
+// }
 
 func InitAndGetAuthInfo(pluginName string) (*proto.AuthInfoResponse, error) {
 	devopsDir := model.InitCoreDirectory()
 
-	pc, err := loadPlugin(logger.Loggerf, pluginName, devopsDir)
+	pc, err := startPlugin(logger.Loggerf, pluginName, devopsDir)
 	if err != nil {
 		time.Sleep(5 * time.Second)
 		os.Exit(1)
@@ -74,31 +57,22 @@ func InitAndGetAuthInfo(pluginName string) (*proto.AuthInfoResponse, error) {
 	return auths, nil
 }
 
-func Start(isTest bool, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
+func Start(pluginName string, conf *model.Config, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
 	// Init plugins
 	// TODO: In server mode, read & save config
 	devopsDir := model.InitCoreDirectory()
 
-	// Load config
-	c := model.LoadConfig(devopsDir)
-
-	checIfPluginExists(devopsDir, c)
-
 	_, loggerf := logger.Loggero, logger.Loggerf
-	if len(c.Plugins) == 0 {
-		log.Fatal("No plugins were specified in the configuration, Exitting...")
-	}
 
 	// On startup load the first plugin
-	initialPlugin := c.Plugins[0]
-	fmt.Printf("Loading plugin: %s\n", initialPlugin.Name)
+	fmt.Printf("Loading plugin: %s\n", pluginName)
 
-	pc, err := loadPlugin(loggerf, initialPlugin.Name, devopsDir)
+	pc, err := startPlugin(loggerf, pluginName, devopsDir)
 	if err != nil {
 		return nil, err
 	}
 
-	kp, err := pc.GetPlugin(initialPlugin.Name)
+	kp, err := pc.GetPlugin(pluginName)
 	if err != nil {
 		return nil, err
 	}
@@ -107,33 +81,12 @@ func Start(isTest bool, authInfo *proto.AuthInfo) (*CurrentPluginContext, error)
 	// defer close(eventChan)
 
 	// Initiate global plugin contexts
-	pCtx, err := initPluginContext(kp, initialPlugin.Name, eventChan, pc, authInfo)
+	pCtx, err := initPluginContext(kp, pluginName, eventChan, pc, authInfo)
 	if err != nil {
 		return nil, err
 	}
 
-	if isTest {
-		return pCtx, err
-	}
-
 	return pCtx, err
-}
-
-func StartTUI() error {
-	logger.InitClientLogging()
-
-	app, err := tui.NewApplication("localhost:3000")
-	if err != nil {
-		return err
-	}
-
-	if err := app.Start(); err != nil {
-		common.Error(logger.Loggerf, fmt.Sprintf("failed to start application: %v", err))
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
-	}
-
-	return nil
 }
 
 // func Init() {

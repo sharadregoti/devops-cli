@@ -26,7 +26,7 @@ type CurrentPluginContext struct {
 
 	appView *tui.Application
 
-	authInfo            *proto.AuthInfoResponse
+	authInfo            *proto.AuthInfo
 	defaultIsolator     string
 	defaultIsolatorType string
 	currentIsolator     string
@@ -70,6 +70,18 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 		return nil, err
 	}
 
+	requiredAuthInfo := new(proto.AuthInfo)
+	for _, ai := range info.AuthInfo {
+		if ai.IdentifyingName == authInfo.IdentifyingName && ai.Name == authInfo.Name {
+			requiredAuthInfo = ai
+			requiredAuthInfo.Info = map[string]string{
+				"name":    ai.IdentifyingName,
+				"context": ai.Name,
+			}
+			break
+		}
+	}
+
 	isolator, err := p.GetDefaultResourceIsolator()
 	if err != nil {
 		return nil, err
@@ -100,7 +112,7 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 		currentPluginName:     pluginName,
 		plugin:                p,
 		appView:               nil,
-		authInfo:              info,
+		authInfo:              requiredAuthInfo,
 		defaultIsolatorType:   defaultIsolatorType,
 		currentIsolator:       isolator,
 		defaultIsolator:       isolator,
@@ -142,7 +154,7 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 					return
 				}
 
-				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r})
+				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r.Result})
 				if err != nil {
 					return
 				}
@@ -153,8 +165,8 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 				}
 
 				cpc.SendMessage(model.WebsocketResponse{
-					// TODO: Fix this, remove 0
-					TableName:       utils.GetTableTitle(defaultIsolatorType, 0),
+					EventType:       r.Type,
+					TableName:       defaultIsolatorType,
 					Data:            tableData,
 					SpecificActions: specificActions.Actions,
 				})
@@ -215,10 +227,10 @@ func (c *CurrentPluginContext) GetInfo(ID string) *model.InfoResponse {
 	return &model.InfoResponse{
 		SessionID: ID,
 		// TODO: Add general
-		General:         map[string]string{},
+		General:         c.authInfo.Info,
 		Actions:         c.currentGenericActions.Actions,
 		ResourceTypes:   c.supportedResourceTypes,
-		DefaultIsolator: []string{c.defaultIsolator},
+		DefaultIsolator: c.authInfo.DefaultIsolators,
 		IsolatorType:    c.defaultIsolatorType,
 	}
 }

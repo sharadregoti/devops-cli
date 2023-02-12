@@ -43,8 +43,8 @@ func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
 				}
 
 				logger.LogTrace("Received new resource from core binary (%v)", r)
-
-				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r})
+				
+				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r.Result})
 				if err != nil {
 					return
 				}
@@ -55,8 +55,8 @@ func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
 				}
 
 				c.SendMessage(model.WebsocketResponse{
-					// TODO: Fix this, remove 0
-					TableName:       utils.GetTableTitle(e.ResourceType, 0),
+					EventType:       r.Type,
+					TableName:       e.ResourceType,
 					Data:            tableData,
 					SpecificActions: specificActions.Actions,
 				})

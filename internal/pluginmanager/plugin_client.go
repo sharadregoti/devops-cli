@@ -3,7 +3,6 @@ package pluginmanager
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 
@@ -43,22 +42,21 @@ var pluginMap = map[string]plugin.Plugin{
 	"kubernetes": &shared.DevopsPlugin{},
 }
 
-func checIfPluginExists(rooDir string, c *model.Config) {
+func ValidatePlugins(c *model.Config) error {
+	devopsDir := model.InitCoreDirectory()
+
 	for _, p := range c.Plugins {
 		fmt.Printf("Checking plugin %s\n", p.Name)
-		_, err := os.Stat(getPluginPath(p.Name, rooDir))
+		_, err := os.Stat(getPluginPath(p.Name, devopsDir))
 		if os.IsNotExist(err) {
-			log.Fatalf("Plugin %s does not exists, use devops init command to install the plugin", p.Name)
+			return fmt.Errorf("Plugin %s does not exists, use devops init command to install the plugin", p.Name)
 		}
 	}
+
+	return nil
 }
 
-func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient, error) {
-	// gob.Register(map[string]interface{}{})
-	// gob.Register([]interface{}{})
-	// gob.Register(make(shared.WatcheResource, 1))
-	// gob.Register(time.Time{})
-
+func startPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient, error) {
 	path := getPluginPath(pluginName, rootDir)
 	logger.Debug("Pluging path", path)
 
@@ -83,7 +81,7 @@ func loadPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient,
 		return nil, fmt.Errorf(str)
 	}
 
-	// Connect via RPC
+	// Connect via GRPC
 	rpcClient, err := client.Client()
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("Failed to initialzed plugin client: %v", err))

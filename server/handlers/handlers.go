@@ -27,18 +27,12 @@ import (
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
 // @Router       /v1/info [get]
-func HandleConfig() http.HandlerFunc {
+func HandleConfig(conf *model.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
 		defer cancel()
 
-		p, err := pm.ListPlugins()
-		if err != nil {
-			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
-			return
-		}
-
-		_ = utils.SendResponse(ctx, w, http.StatusOK, model.ConfigResponse{Plugins: p})
+		_ = utils.SendResponse(ctx, w, http.StatusOK, conf)
 	}
 }
 
@@ -67,7 +61,7 @@ func HandleAuth(sm *pm.SessionManager) http.HandlerFunc {
 			return
 		}
 
-		_ = utils.SendResponse(ctx, w, http.StatusOK, model.AuthResponse{Auths: auths})
+		_ = utils.SendResponse(ctx, w, http.StatusOK, model.AuthResponse{Auths: auths.AuthInfo})
 	}
 }
 
@@ -90,9 +84,10 @@ func HandleInfo(sm *pm.SessionManager) http.HandlerFunc {
 		params := mux.Vars(r)
 		authID := params["authId"]
 		contextID := params["contextId"]
+		pluginName := params["pluginName"]
 
 		ID := fmt.Sprintf("%d", sm.SessionCount()+1)
-		if err := sm.AddClient(ID, authID, contextID); err != nil {
+		if err := sm.AddClient(ID, pluginName, authID, contextID); err != nil {
 			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
 			return
 		}

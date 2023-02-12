@@ -96,6 +96,13 @@ func (d *Kubernetes) Connect(authInfo *proto.AuthInfo) error {
 	d.normalClient = clientset
 	d.resourceTypes = resourceTypeMap
 
+	// authInfo.Info = map[string]string{
+	// 	"name":    authInfo.IdentifyingName,
+	// 	"context": authInfo.Name,
+	// 	"user":    "",
+	// 	"server":  "",
+	// }
+
 	return nil
 }
 

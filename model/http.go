@@ -60,6 +60,7 @@ type FrontendEvent struct {
 type WebsocketResponse struct {
 	ID              string          `json:"id" yaml:"id"`
 	TableName       string          `json:"name" yaml:"name"`
+	EventType       string          `json:"eventType" yaml:"eventType"`
 	Data            []*TableRow     `json:"data" yaml:"data"`
 	SpecificActions []*proto.Action `json:"specificActions" yaml:"specificActions"`
 }
@@ -89,10 +90,6 @@ func (lri *LongRunningInfo) GetE() *Event {
 	return lri.e
 }
 
-type ConfigResponse struct {
-	Plugins []string `json:"plugins" yaml:"plugins"`
-}
-
 type AuthResponse struct {
-	Auths *proto.AuthInfoResponse `json:"auths" yaml:"auths"`
+	Auths []*proto.AuthInfo `json:"auths" yaml:"auths"`
 }

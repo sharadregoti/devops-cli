@@ -9,16 +9,18 @@ import (
 )
 
 type SessionManager struct {
-	m map[string]*sessionInfo
+	conf *model.Config
+	m    map[string]*sessionInfo
 }
 
 type sessionInfo struct {
 	c *CurrentPluginContext
 }
 
-func NewSM() (*SessionManager, error) {
+func NewSM(conf *model.Config) (*SessionManager, error) {
 	return &SessionManager{
-		m: make(map[string]*sessionInfo),
+		conf: conf,
+		m:    make(map[string]*sessionInfo),
 	}, nil
 }
 
@@ -45,10 +47,10 @@ func (s *SessionManager) GetClient(ID string) (*CurrentPluginContext, error) {
 	return info.c, nil
 }
 
-func (s *SessionManager) AddClient(ID, authID, contextID string) error {
+func (s *SessionManager) AddClient(ID, pluginName, authID, contextID string) error {
 	_, ok := s.m[ID]
 	if !ok {
-		pCtx, err := Start(false, &proto.AuthInfo{IdentifyingName: authID, Name: contextID})
+		pCtx, err := Start(pluginName, s.conf, &proto.AuthInfo{IdentifyingName: authID, Name: contextID})
 		if err != nil {
 			return err
 		}

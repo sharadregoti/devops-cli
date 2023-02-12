@@ -1,0 +1,4 @@
+server:
+  address: ":9753"
+plugins:
+  - name: kubernetes
