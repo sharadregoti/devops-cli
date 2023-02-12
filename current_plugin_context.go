@@ -3,11 +3,8 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
@@ -18,8 +15,6 @@ import (
 )
 
 type CurrentPluginContext struct {
-	logger hclog.Logger
-
 	currentPluginName string
 
 	// This field indicates current nest level
@@ -51,6 +46,8 @@ type CurrentPluginContext struct {
 
 	eventChan chan model.Event
 
+	done chan struct{}
+
 	pc *PluginClient
 
 	actionsToExecute map[string]*actionsToExecute
@@ -62,9 +59,7 @@ type actionsToExecute struct {
 	e          model.Event
 }
 
-func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, eventChan chan model.Event, pc *PluginClient, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
-	// Get known changing infor
-	logger.Info("initializing plugin context")
+func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.Event, pc *PluginClient, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
 	err := p.Connect(authInfo)
 	if err != nil {
 		return nil, err
@@ -72,38 +67,28 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, 
 
 	info, err := p.GetAuthInfo()
 	if err != nil {
-		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
-	logger.Info("GetAuthInfo")
 
 	isolator, err := p.GetDefaultResourceIsolator()
 	if err != nil {
-		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
-	logger.Info("GetDefaultResourceIsolator")
 
 	resourceTypeList, err := p.GetResourceTypeList()
 	if err != nil {
-		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
-	logger.Info("GetResourceTypeList")
 
 	defaultIsolatorType, err := p.GetResourceIsolatorType()
 	if err != nil {
-		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
-	logger.Info("GetResourceIsolatorType")
 
 	actions, err := p.GetSupportedActions()
 	if err != nil {
-		common.Error(logger, fmt.Sprintf("initial resource fetching failed: %v", err))
 		return nil, err
 	}
-	logger.Info("GetSupportedActions")
 
 	actions.Actions = append(actions.Actions, &proto.Action{
 		Name:       string(model.ViewLongRunning),
@@ -111,13 +96,7 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, 
 		OutputType: model.OutputTypeString,
 	})
 
-	// app.SearchView.SetResourceTypes(resourceTypeList)
-	// app.GeneralInfoView.Refresh(info)
-	// app.IsolatorView.SetDefault(isolator)
-	// app.IsolatorView.SetTitle(strings.Title(defaultIsolatorType))
-
-	return &CurrentPluginContext{
-		logger:                logger,
+	cpc := &CurrentPluginContext{
 		currentPluginName:     pluginName,
 		plugin:                p,
 		appView:               nil,
@@ -132,14 +111,63 @@ func initPluginContext(logger hclog.Logger, p shared.Devops, pluginName string, 
 		// currentSchema:              model.ResourceTransfomer{},
 		currentNestedResourceLevel: 0,
 		tableStack:                 make([]*resourceStack, 0),
-		eventChan:                  eventChan,
-		pc:                         pc,
-		actionsToExecute:           map[string]*actionsToExecute{},
-	}, nil
+		// TODO: This channel is not required
+		eventChan:        eventChan,
+		pc:               pc,
+		actionsToExecute: map[string]*actionsToExecute{},
+	}
+
+	// start default watcher
+	ch, _, err := p.WatchResources(defaultIsolatorType)
+	if err != nil {
+		return nil, logger.LogError("Error while starting watcher", err)
+	}
+
+	done := make(chan struct{}, 1)
+	cpc.done = done
+	// TODO: Writing to c.done does not close this go routine
+	go func() {
+		logger.LogDebug("Core binary resource watcher default routine has been started for resource type (%s)", defaultIsolatorType)
+		defer logger.LogDebug("Core binary resource watcher default routine has been stopped for resource type (%s)", defaultIsolatorType)
+
+		for {
+			select {
+			case <-done:
+				logger.LogTrace("Core binary resource watcher routine default: Done received for resource type (%s)", defaultIsolatorType)
+				return
+
+			case r := <-ch:
+				schema, err := p.GetResourceTypeSchema(defaultIsolatorType)
+				if err != nil {
+					return
+				}
+
+				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r})
+				if err != nil {
+					return
+				}
+
+				specificActions, err := p.GetSpecficActionList(defaultIsolatorType)
+				if err != nil {
+					return
+				}
+
+				cpc.SendMessage(model.WebsocketResponse{
+					// TODO: Fix this, remove 0
+					TableName:       utils.GetTableTitle(defaultIsolatorType, 0),
+					Data:            tableData,
+					SpecificActions: specificActions.Actions,
+				})
+			}
+		}
+	}()
+
+	// done <- struct{}{}
+
+	return cpc, nil
 }
 
 func (c *CurrentPluginContext) SetDataPipe(dataPipe chan model.WebsocketResponse) {
-	logger.LogDebug("Setting data pipe for pctx")
 	c.dataPipe = dataPipe
 }
 
@@ -147,18 +175,13 @@ func (c *CurrentPluginContext) GetDataPipe() chan model.WebsocketResponse {
 	return c.dataPipe
 }
 
-func (c *CurrentPluginContext) InvokeEvent(e model.Event) {
-	c.eventChan <- e
-	logger.LogDebug("A new event has been invoked", e.Type)
-}
-
 func (c *CurrentPluginContext) SendMessage(v model.WebsocketResponse) {
-	logger.LogDebug("Writing message into data pipe")
+	logger.LogTrace("Writing message into data pipe")
 	if c.dataPipe == nil {
 		return
 	}
 	c.dataPipe <- v
-	logger.LogDebug("Message written")
+	logger.LogTrace("Message written")
 }
 
 func (c *CurrentPluginContext) Close() error {
@@ -277,7 +300,7 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 	schema, err := c.plugin.GetResourceTypeSchema(rs.currentResourceType)
 	if err != nil {
-		common.Error(c.logger, fmt.Sprintf("failed to fetch resource type schema: %v", err))
+		logger.LogError("failed to fetch resource type schema: %v", err)
 		return
 	}
 
@@ -285,10 +308,9 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 	// TODO: Remove enent type condition from here
 	// if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && parent.currentSchema.Nesting.IsSelfContainedInParent {
 	if parent := c.getCurrentResource(); event.RowIndex > 0 && parent != nil && schema.Nesting.IsSelfContainedInParent {
-		c.logger.Debug("Getting nested resource from parent")
+		logger.LogError("Getting nested resource from parent")
 		resources, err = transformer.GetSelfContainedResource(schema.Nesting.ParentDataPaths, parent.currentResources[event.RowIndex-1])
 		if err != nil {
-			common.Error(c.logger, err.Error())
 			c.appView.SetFlashText(err.Error())
 			return
 		}
@@ -296,7 +318,6 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 		resources, err = c.plugin.GetResources(&proto.GetResourcesArgs{ResourceType: rs.currentResourceType, IsolatorId: c.currentIsolator, Args: utils.GetMap(fnArgs)})
 		if err != nil {
-			common.Error(c.logger, fmt.Sprintf("failed to fetch resources: %v", err))
 			c.appView.SetFlashText(err.Error())
 			return
 		}
@@ -314,7 +335,6 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 	actions, err := c.plugin.GetSupportedActions()
 	if err != nil {
-		common.Error(c.logger, fmt.Sprintf("unable to get supported actions of resource: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
 		return
 	}
@@ -322,7 +342,6 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 	specificActions, err := c.plugin.GetSpecficActionList(rs.currentResourceType)
 	if err != nil {
-		common.Error(c.logger, fmt.Sprintf("unable to get specific actions of resource: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
 		return
 	}
@@ -356,9 +375,8 @@ func (c *CurrentPluginContext) syncResource(event model.Event) {
 
 func (c *CurrentPluginContext) handle(w http.ResponseWriter, req *http.Request) {
 	rs := c.tableStack[c.currentNestedResourceLevel]
-	table, _, err := transformer.GetResourceInTableFormat(c.logger, rs.currentSchema, rs.currentResources)
+	table, _, err := transformer.GetResourceInTableFormat(rs.currentSchema, rs.currentResources)
 	if err != nil {
-		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
 		return
 	}
@@ -403,9 +421,8 @@ func SendResponse(ctx context.Context, w http.ResponseWriter, statusCode int, bo
 func (c *CurrentPluginContext) setAppView() {
 
 	rs := c.tableStack[c.currentNestedResourceLevel]
-	tableData, nestArgs, err := transformer.GetResourceInTableFormat(c.logger, rs.currentSchema, rs.currentResources)
+	tableData, nestArgs, err := transformer.GetResourceInTableFormat(rs.currentSchema, rs.currentResources)
 	if err != nil {
-		common.Error(c.logger, fmt.Sprintf("unable to convert resource data of type into table format: %v, %v", rs.currentResourceType, err))
 		c.appView.SetFlashText(err.Error())
 		return
 	}

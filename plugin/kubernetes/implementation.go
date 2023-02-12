@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,10 +12,13 @@ import (
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/shared"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -122,48 +126,116 @@ func (d *Kubernetes) GetResources(args *proto.GetResourcesArgs) ([]interface{}, 
 
 // TODO: test & fix this
 func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
-	res, ok := d.resourceWatcherChanMap[resourceType]
-	if !ok {
-		return fmt.Errorf("channel for resource type %s does not exists", resourceType)
-	}
+	// res, ok := d.resourceWatcherChanMap[resourceType]
+	// if !ok {
+	// 	return shared.LogError("channel for resource type %s does not exists", resourceType)
+	// }
 
-	d.logger.Debug("Closing resource watcher", resourceType)
-	close(res)
+	// d.logger.Debug(fmt.Sprintf("Closing resource watcher %s", resourceType))
+	// res.serverDone <- struct{}{}
+	// res.watcherDone <- struct{}{}
 	return nil
 }
 
 // TODO: test & fix this
 func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResourceResult, chan struct{}, error) {
-	// res, ok := d.resourceWatcherChanMap[resourceType]
-	// if ok {
-	// 	// Send it
-	// 	d.logger.Debug("Channel already exists for resource", resourceType)
-	// 	return res, nil
-	// }
+	if len(d.resourceWatcherChanMap) > 0 {
+		for k, v := range d.resourceWatcherChanMap {
+			d.logger.Trace(fmt.Sprintf("Invoking close resource watcher event for resource type %s", k))
+			v.serverDone <- struct{}{}
+			v.watcherDone <- struct{}{}
+		}
+		d.resourceWatcherChanMap = make(map[string]channels)
+	}
 
-	// d.logger.Debug("Creating a new channel for resource", resourceType)
-	// d.lock.Lock()
-	// c := make(shared.WatcheResource, 1)
-	// d.resourceWatcherChanMap[resourceType] = c
-	// d.lock.Unlock()
+	_, ok := d.resourceWatcherChanMap[resourceType]
+	if ok {
+		d.logger.Debug(fmt.Sprintf("Channel already exists for resource %s", resourceType))
+		return nil, nil, nil
+	}
 
-	// go func() {
-	// 	r := d.resourceTypes[resourceType]
-	// 	err := getResourcesDynamically(c, d.dynamicClient, context.Background(), r.group, r.version, r.resourceTypeName, "default")
-	// 	if err != nil {
-	// 		common.Error(d.logger, fmt.Sprintf("failed to watch over resource %s: %w", resourceType, err))
-	// 		return
-	// 	}
-	// }()
+	watcher, err := d.watchResourceDynamic(context.Background(), &proto.GetResourcesArgs{ResourceType: resourceType, IsolatorId: "default"})
+	if err != nil {
+		return nil, nil, shared.LogError("failed to watch over resource %s: %v", resourceType, err)
+	}
 
-	return nil, nil, nil
+	watcherDone := make(chan struct{}, 1)
+	serverDone := make(chan struct{}, 1)
+	ch := make(chan shared.WatchResourceResult, 1)
+	go func() {
+		shared.LogDebug("plugin routine: resource watcher has been started for resource type (%s)", resourceType)
+		defer shared.LogDebug("plugin routine: resource watcher has been stopped for resource type (%s)", resourceType)
+
+		for {
+			select {
+			case <-watcherDone:
+				shared.LogTrace("plugin routine: Done received for resource type (%s)", resourceType)
+				return
+
+			case event, ok := <-watcher.ResultChan():
+				if !ok {
+					shared.LogDebug("Watcher routine: Watcher channel closed for resource %s", resourceType)
+					return
+				}
+
+				shared.LogTrace("Watcher routine: got event for resource type (%s), event type (%s)", resourceType, strings.ToLower(string(event.Type)))
+
+				b, err := json.Marshal(event.Object)
+				if err != nil {
+					shared.LogError("failed to marshal event object: %v", err)
+					return
+				}
+
+				var rawJson map[string]interface{}
+				if err := json.Unmarshal(b, &rawJson); err != nil {
+					shared.LogError("Watcher routine: failed to unmarshal event object: %v", err)
+					return
+				}
+
+				meta := rawJson["metadata"].(map[string]interface{})
+				delete(meta, "managedFields")
+				rawJson["metadata"] = meta
+				if resourceType == "pods" {
+					obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(b, nil, nil)
+					if err != nil {
+						shared.LogError("Watcher routine: failed to unstructure resource: %v", err)
+						return
+					}
+					rawJson["customCalculatedStatus"] = Phase(obj.(*v1.Pod))
+
+				}
+
+				ch <- shared.WatchResourceResult{
+					Type:   strings.ToLower(string(event.Type)),
+					Result: rawJson,
+				}
+			}
+		}
+
+	}()
+
+	d.resourceWatcherChanMap[resourceType] = channels{watcherDone: watcherDone, serverDone: serverDone}
+	return ch, serverDone, nil
+}
+
+func convertToMap(obj runtime.Object) (map[string]interface{}, error) {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (*proto.ResourceTransformer, error) {
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
-		d.logger.Debug(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
-
+		d.logger.Trace(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
 		return d.resourceTypeConfigurations["defaults"], nil
 	}
 
@@ -275,7 +347,7 @@ func (d *Kubernetes) ActionUpdateResource(args *proto.ActionUpdateResourceArgs) 
 func (d *Kubernetes) GetSpecficActionList(resourceType string) (*proto.GetActionListResponse, error) {
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
-		d.logger.Info(fmt.Sprintf("specific action list schema of resource type %s not found, using the default schema", resourceType))
+		d.logger.Trace(fmt.Sprintf("specific action list schema of resource type %s not found, using the default schema", resourceType))
 		t = d.resourceTypeConfigurations["defaults"]
 	}
 

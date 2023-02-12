@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/shared"
 )
 
 var Loggerf hclog.Logger
@@ -39,13 +40,13 @@ func createLoggers(file *os.File) (loggero, loggerf hclog.Logger) {
 	loggero = hclog.New(&hclog.LoggerOptions{
 		Name:   "devops",
 		Output: os.Stdout,
-		Level:  hclog.Debug,
+		Level:  shared.GetHCLLogLevel(),
 	})
 
 	loggerf = hclog.New(&hclog.LoggerOptions{
 		Name:   "devops",
 		Output: file,
-		Level:  hclog.Debug,
+		Level:  shared.GetHCLLogLevel(),
 	})
 
 	return
@@ -120,6 +121,14 @@ func LogDebug(msg string, args ...interface{}) {
 		Loggerf.Debug(fmt.Sprintf(msg, args...))
 	} else {
 		Loggerf.Debug(msg)
+	}
+}
+
+func LogTrace(msg string, args ...interface{}) {
+	if len(args) > 0 {
+		Loggerf.Trace(fmt.Sprintf(msg, args...))
+	} else {
+		Loggerf.Trace(msg)
 	}
 }
 

@@ -19,65 +19,37 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-func getResourcesDynamically(c chan shared.WatchResourceResult, dynamic dynamic.Interface, ctx context.Context, group string, version string, resource string, namespace string) error {
+func (d *Kubernetes) watchResourceDynamic(ctx context.Context, args *proto.GetResourcesArgs) (watch.Interface, error) {
+	shared.LogTrace("client: watchResourceDynamic called for resource type %s", args.ResourceType)
+
+	rt, ok := d.resourceTypes[args.ResourceType]
+	if !ok {
+		return nil, shared.LogError("client: could not find resource type %s in current kubernetes context", args.ResourceType)
+	}
+
 	resourceId := schema.GroupVersionResource{
-		Group:    group,
-		Version:  version,
-		Resource: resource,
+		Group:    rt.group,
+		Version:  rt.version,
+		Resource: rt.resourceTypeName,
 	}
 
-	list, err := dynamic.Resource(resourceId).Namespace(namespace).Watch(ctx, metav1.ListOptions{})
+	var list watch.Interface
+	var err error
+
+	if rt.isNamespaced {
+		list, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorId).Watch(ctx, metav1.ListOptions{})
+	} else {
+		list, err = d.dynamicClient.Resource(resourceId).Watch(ctx, metav1.ListOptions{})
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	result := make([]interface{}, 0)
-	for e := range list.ResultChan() {
-		obj2, ok := e.Object.(interface{})
-		if !ok {
-			continue
-		}
-		result = append(result, obj2)
-
-		obj, ok := e.Object.(*unstructured.Unstructured)
-		if !ok {
-			continue
-		}
-
-		c <- shared.WatchResourceResult{Type: strings.ToLower(string(e.Type)), Result: obj.UnstructuredContent()}
-
-		// switch e.Type {
-		// case watch.Added:
-		// 	fmt.Println("Added:")
-		// 	data, _ := json.MarshalIndent(obj, " ", " ")
-		// 	fmt.Println(string(data))
-		// 	c <- shared.WatchResourceResult{Type: strings.ToLower(string(e.Type)), Result: obj.UnstructuredContent()}
-		// case watch.Deleted:
-		// 	fmt.Println("Deleted:")
-		// 	data, _ := json.MarshalIndent(obj, " ", " ")
-		// 	fmt.Println(string(data))
-		// case watch.Modified:
-		// 	fmt.Println("Updated:")
-		// 	data, _ := json.MarshalIndent(obj, " ", " ")
-		// 	fmt.Println(string(data))
-		// }
-	}
-
-	// result := make([]interface{}, 0)
-	// for _, item := range list.Items {
-	// 	var rawJson interface{}
-	// 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(item.Object, &rawJson)
-	// 	if err != nil {
-	// 		return  err
-	// 	}
-	// 	result = append(result, rawJson)
-	// }
-
-	return nil
+	return list, nil
 }
 
 func (d *Kubernetes) getPodLogs(resourceName, namespace, containerName string) (string, error) {

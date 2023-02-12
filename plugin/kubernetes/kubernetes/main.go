@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"os"
 
@@ -27,27 +26,22 @@ func main() {
 	go common.ConnLoggingInit()
 
 	logger := hclog.New(&hclog.LoggerOptions{
-		Name:       "kubernetes-plugin-server",
-		Level:      hclog.Trace,
-		Output:     os.Stderr,
-		JSONFormat: true,
+		Name:   "k8s",
+		Level:  shared.GetHCLLogLevel(),
+		Output: os.Stderr,
 	})
+	shared.Logger = logger
 
-	gob.Register(map[string]interface{}{})
-	gob.Register([]interface{}{})
-	gob.Register(make(chan shared.WatchResourceResult))
-
-	logger.Info("Starting kubernetes plugin server")
+	shared.LogInfo("Starting kubernetes plugin server")
 
 	pluginK8s, err := pnk8s.New(logger.Named(pnk8s.PluginName))
 	if err != nil {
 		common.Error(logger, fmt.Sprintf("failed to initialized kubernetes plugin: %v", err))
-		// os.Exit(1)
 	}
 
 	// pluginMap is the map of plugins we can dispense.
 	var pluginMap = map[string]plugin.Plugin{
-		"kubernetes": &shared.DevopsPlugin{Impl: pluginK8s},
+		"kubernetes": &shared.DevopsPlugin{Impl: pluginK8s, Logger: logger},
 	}
 
 	plugin.Serve(&plugin.ServeConfig{

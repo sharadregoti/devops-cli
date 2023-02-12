@@ -3,6 +3,7 @@ package shared
 import (
 	"context"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"github.com/sharadregoti/devops/proto"
 	"google.golang.org/grpc"
@@ -10,8 +11,8 @@ import (
 
 type DevopsPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-
-	Impl Devops
+	Logger hclog.Logger
+	Impl   Devops
 }
 
 // func (p *DevopsPlugin) Server(*plugin.MuxBroker) (interface{}, error) {
@@ -24,7 +25,7 @@ type DevopsPlugin struct {
 // }
 
 func (p *DevopsPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	proto.RegisterDevopsServer(s, &GRPCServer{Impl: p.Impl})
+	proto.RegisterDevopsServer(s, &GRPCServer{Impl: p.Impl, Logger: p.Logger})
 	return nil
 }
 

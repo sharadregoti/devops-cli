@@ -12,7 +12,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/proto"
-	"github.com/sharadregoti/devops/shared"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -36,9 +35,6 @@ type Kubernetes struct {
 
 	isOK error
 
-	// This channel listen for close streaming event from server & closes the corresponding process which is running in background
-	activeChans chan struct{}
-
 	// Clients
 	normalClient  *kubernetes.Clientset
 	dynamicClient dynamic.Interface
@@ -51,9 +47,14 @@ type Kubernetes struct {
 	resourceTypeConfigurations map[string]*proto.ResourceTransformer
 
 	// Key is resource type
-	resourceWatcherChanMap map[string]chan shared.WatchResourceResult
+	resourceWatcherChanMap map[string]channels
 
 	kubeCLIconfig *Config
+}
+
+type channels struct {
+	watcherDone chan struct{}
+	serverDone  chan struct{}
 }
 
 type resourceTypeList map[string]*resourceTypeInfo
@@ -119,7 +120,6 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 		if err := yaml.Unmarshal(data, res); err != nil {
 			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal table schema data: %w", err)
 		}
-		logger.Debug("Resource schema", "resource", "schema", res)
 		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = res
 	}
 
@@ -187,8 +187,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	return &Kubernetes{
 		logger:                     logger,
 		resourceTypeConfigurations: resourceSchemaTypeMap,
-		resourceWatcherChanMap:     make(map[string]chan shared.WatchResourceResult),
-		activeChans:                make(chan struct{}, 1),
+		resourceWatcherChanMap:     make(map[string]channels),
 		kubeCLIconfig:              res,
 	}, nil
 }

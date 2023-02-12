@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 
-	"github.com/gorilla/websocket"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils/logger"
@@ -14,8 +13,7 @@ type SessionManager struct {
 }
 
 type sessionInfo struct {
-	conn *websocket.Conn
-	c    *CurrentPluginContext
+	c *CurrentPluginContext
 }
 
 func NewSM() (*SessionManager, error) {
@@ -59,7 +57,6 @@ func (s *SessionManager) AddClient(ID, authID, contextID string) error {
 		pCtx.SetDataPipe(dataPipe)
 
 		s.m[ID] = &sessionInfo{
-			// conn: conn,
 			c: pCtx,
 		}
 		logger.LogInfo("New client with ID (%s) is added", ID)

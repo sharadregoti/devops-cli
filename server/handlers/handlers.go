@@ -232,7 +232,8 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 				return
 
 			case model.ResourceTypeChanged:
-				if pCtx.ReadSync(e); err != nil {
+				
+				if pCtx.ResourceChanged(e); err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}

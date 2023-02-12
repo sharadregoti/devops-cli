@@ -83,6 +83,7 @@ func InitAndGetAuthInfo(pluginName string) (*proto.AuthInfoResponse, error) {
 
 func Start(isTest bool, authInfo *proto.AuthInfo) (*CurrentPluginContext, error) {
 	// Init plugins
+	// TODO: In server mode, read & save config
 	devopsDir := model.InitCoreDirectory()
 
 	// Load config
@@ -101,53 +102,27 @@ func Start(isTest bool, authInfo *proto.AuthInfo) (*CurrentPluginContext, error)
 
 	pc, err := loadPlugin(loggerf, initialPlugin.Name, devopsDir)
 	if err != nil {
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
+		return nil, err
 	}
 
 	kp, err := pc.GetPlugin(initialPlugin.Name)
 	if err != nil {
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
+		return nil, err
 	}
-
-	// authInfos, err := kp.GetAuthInfo()
-
-	// if err := kp.StatusOK(); err != nil {
-	// 	common.Error(loggero, fmt.Sprintf("failed to load plugin: %v", err))
-	// 	time.Sleep(5 * time.Second)
-	// 	os.Exit(1)
-	// }
 
 	eventChan := make(chan model.Event, 1)
 	// defer close(eventChan)
 
 	// Initiate global plugin contexts
-	pCtx, err := initPluginContext(loggerf, kp, initialPlugin.Name, eventChan, pc, authInfo)
+	pCtx, err := initPluginContext(kp, initialPlugin.Name, eventChan, pc, authInfo)
 	if err != nil {
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
+		return nil, err
 	}
 
 	if isTest {
 		return pCtx, err
 	}
 
-	// Invoke default
-	eventChan <- model.Event{
-		ResourceType:       pCtx.defaultIsolatorType,
-		Type:               string(model.ResourceTypeChanged),
-		RowIndex:           0,
-		ResourceName:       "",
-		IsolatorName:       "",
-		SpecificActionName: "",
-	}
-
-	// Start Event Loop
-	StartEventLoop(eventChan, pCtx, loggerf)
-
-	// Invoke initial event
-	// Now we can invoke frontends
 	return pCtx, err
 }
 

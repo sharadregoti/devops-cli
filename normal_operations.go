@@ -1,14 +1,71 @@
 package core
 
 import (
-	"fmt"
-
 	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils"
+	"github.com/sharadregoti/devops/utils/logger"
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
+	// close previous watcher
+	// TODO: Writing to c.done does not close this go routine
+	// c.done <- struct{}{}
+
+	// TODO: Fix this, CloseResourceWatcher does not do any specific work
+	if err := c.plugin.CloseResourceWatcher(""); err != nil {
+		return err
+	}
+
+	ch, _, err := c.plugin.WatchResources(e.ResourceType)
+	if err != nil {
+		return logger.LogError("Error while starting watcher", err)
+	}
+
+	done := make(chan struct{}, 1)
+	// TODO: Writing to c.done does not close this go routine
+	c.done = done
+	go func() {
+		logger.LogDebug("Core binary resource watcher routine has been started for resource type (%s)", e.ResourceType)
+		defer logger.LogDebug("Core binary resource watcher routine has been stopped for resource type (%s)", e.ResourceType)
+		for {
+			select {
+			case <-done:
+				logger.LogTrace("Core binary resource watcher routine default: Done received for resource type (%s)", e.ResourceType)
+				return
+
+			case r := <-ch:
+				schema, err := c.plugin.GetResourceTypeSchema(e.ResourceType)
+				if err != nil {
+					return
+				}
+
+				logger.LogTrace("Received new resource from core binary (%v)", r)
+
+				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r})
+				if err != nil {
+					return
+				}
+
+				specificActions, err := c.plugin.GetSpecficActionList(e.ResourceType)
+				if err != nil {
+					return
+				}
+
+				c.SendMessage(model.WebsocketResponse{
+					// TODO: Fix this, remove 0
+					TableName:       utils.GetTableTitle(e.ResourceType, 0),
+					Data:            tableData,
+					SpecificActions: specificActions.Actions,
+				})
+			}
+		}
+	}()
+
+	return nil
+}
 
 func (c *CurrentPluginContext) ReadSync(e model.Event) error {
 	resources, err := c.plugin.GetResources(&proto.GetResourcesArgs{
@@ -25,7 +82,7 @@ func (c *CurrentPluginContext) ReadSync(e model.Event) error {
 		return err
 	}
 
-	tableData, _, err := transformer.GetResourceInTableFormat(c.logger, schema, resources)
+	tableData, _, err := transformer.GetResourceInTableFormat(schema, resources)
 	if err != nil {
 		return err
 	}
@@ -68,7 +125,7 @@ func (c *CurrentPluginContext) Read(e model.Event) (map[string]interface{}, erro
 		return nil, err
 	}
 	if len(resources) == 0 {
-		return nil, fmt.Errorf("not found")
+		logger.LogDebug("Resource is zero")
 	}
 	return resources[0].(map[string]interface{}), nil
 }

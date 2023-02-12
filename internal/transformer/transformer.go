@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/antonmedv/expr"
-	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/proto"
 	"github.com/tidwall/gjson"
@@ -64,7 +63,7 @@ func GetArgs(resource interface{}, args map[string]interface{}) map[string]inter
 	return nestArgs
 }
 
-func GetResourceInTableFormat(logger hclog.Logger, t *proto.ResourceTransformer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
+func GetResourceInTableFormat(t *proto.ResourceTransformer, resources []interface{}) ([]*model.TableRow, []map[string]interface{}, error) {
 	gjson.AddModifier("age", func(json, arg string) string {
 		return getAge(json[1 : len(json)-1])
 	})
@@ -86,7 +85,7 @@ func GetResourceInTableFormat(logger hclog.Logger, t *proto.ResourceTransformer,
 
 	nestArgs := []map[string]interface{}{}
 	for _, resource := range resources {
-		res, nestArg, err := TransformResource(logger, t, resource)
+		res, nestArg, err := TransformResource(t, resource)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -102,7 +101,7 @@ func GetResourceInTableFormat(logger hclog.Logger, t *proto.ResourceTransformer,
 	return tableResult, nestArgs, nil
 }
 
-func TransformResource(logger hclog.Logger, t *proto.ResourceTransformer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
+func TransformResource(t *proto.ResourceTransformer, data interface{}) (*model.TableRow, map[string]interface{}, error) {
 	resultRow := new(model.TableRow)
 	dataRow := make([]string, 0)
 
@@ -155,7 +154,7 @@ func TransformResource(logger hclog.Logger, t *proto.ResourceTransformer, data i
 			// Evaluate the condition
 			program, err := expr.Compile(c, expr.Env(data))
 			if err != nil {
-				logger.Debug("skipping style condition as failed to compile style condition", err)
+				// logger.LogDebug("skipping style condition as failed to compile style condition: %v", err)
 				continue
 			}
 

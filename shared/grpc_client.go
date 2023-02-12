@@ -9,7 +9,9 @@ import (
 	"github.com/sharadregoti/devops/proto"
 )
 
-type GRPCClient struct{ client proto.DevopsClient }
+type GRPCClient struct {
+	client proto.DevopsClient
+}
 
 func (g *GRPCClient) Name() string {
 	res, err := g.client.Name(context.Background(), &empty.Empty{})
@@ -40,17 +42,30 @@ func (g *GRPCClient) WatchResources(resourceType string) (chan WatchResourceResu
 
 	ch := make(chan WatchResourceResult, 1)
 	done := make(chan struct{}, 1)
+	// TODO: We cannot close the go routine. As resp.Recv() is blocking call & break only when the plugin exits
 	go func() {
+		fmt.Printf("grpc client routine: resource watcher has been started for resource type (%s)\n", resourceType)
+		defer fmt.Printf("grpc client routine: resource watcher has been stopped for resource type (%s)\n", resourceType)
+
 		for {
-			res, err := resp.Recv()
-			if err != nil {
-				done <- struct{}{}
-				fmt.Println("Error while reading stream:", err)
+			select {
+			case <-done:
+				fmt.Printf("grpc client routine: resource watcher Done received for resource type (%s)", resourceType)
 				return
-			}
-			ch <- WatchResourceResult{
-				Type:   res.Type,
-				Result: res.Result.GetStructValue().AsMap(),
+
+			default:
+				// This closes when the plugin exists
+				res, err := resp.Recv()
+				if err != nil {
+					// done <- struct{}{}
+					fmt.Printf("grpc client routine: Error while watching resource for type (%s) got error: %s\n", resourceType, err)
+					return
+				}
+
+				ch <- WatchResourceResult{
+					Type:   res.Type,
+					Result: res.Result.GetStructValue().AsMap(),
+				}
 			}
 		}
 	}()
