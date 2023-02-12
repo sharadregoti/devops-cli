@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	shared "github.com/sharadregoti/devops-plugin-sdk"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/proto"
-	"github.com/sharadregoti/devops/shared"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"

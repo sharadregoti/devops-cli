@@ -1,4 +1,4 @@
-package shared
+package sdk
 
 type WatchResourceResult struct {
 	Type   string

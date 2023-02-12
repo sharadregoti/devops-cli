@@ -11,7 +11,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
-	"github.com/sharadregoti/devops/proto"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"

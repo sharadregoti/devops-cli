@@ -1,6 +1,6 @@
-package shared
+package sdk
 
-import "github.com/sharadregoti/devops/proto"
+import "github.com/sharadregoti/devops-plugin-sdk/proto"
 
 type Devops interface {
 	Name() string

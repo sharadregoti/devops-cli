@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	shared "github.com/sharadregoti/devops-plugin-sdk"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/common"
-	"github.com/sharadregoti/devops/proto"
-	"github.com/sharadregoti/devops/shared"
 	"github.com/tidwall/gjson"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
+	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/shared"
 )
 
 var Loggerf hclog.Logger

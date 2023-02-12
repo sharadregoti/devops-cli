@@ -3,8 +3,8 @@ package core
 import (
 	"fmt"
 
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils/logger"
 )
 

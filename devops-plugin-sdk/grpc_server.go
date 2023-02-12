@@ -1,15 +1,16 @@
-package shared
+package sdk
 
 import (
 	"context"
 	"fmt"
 	"log"
 
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
+
 	"github.com/golang/protobuf/ptypes/empty"
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/hashicorp/go-hclog"
-	"github.com/sharadregoti/devops/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"

@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/sharadregoti/devops/proto"
-	"github.com/sharadregoti/devops/shared"
+	shared "github.com/sharadregoti/devops-plugin-sdk"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 )
 
 type tableStack []*resourceStack

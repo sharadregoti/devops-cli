@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils/logger"
 )
 

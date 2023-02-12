@@ -2,7 +2,7 @@ package model
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/sharadregoti/devops/proto"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 )
 
 type WebsocketReadWriter struct {

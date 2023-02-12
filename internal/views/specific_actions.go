@@ -2,7 +2,7 @@ package views
 
 import (
 	"github.com/rivo/tview"
-	"github.com/sharadregoti/devops/proto"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 )
 
 type SpecificActions struct {

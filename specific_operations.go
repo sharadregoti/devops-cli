@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kr/pty"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/proto"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
 	"golang.org/x/term"

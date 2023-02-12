@@ -9,9 +9,9 @@ import (
 
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/shared"
 )
 
 type PluginClient struct {

@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	shared "github.com/sharadregoti/devops-plugin-sdk"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/internal/views"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/proto"
-	"github.com/sharadregoti/devops/shared"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
 )

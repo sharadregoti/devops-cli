@@ -1,11 +1,12 @@
-package shared
+package sdk
 
 import (
 	"context"
 
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-	"github.com/sharadregoti/devops/proto"
 	"google.golang.org/grpc"
 )
 
@@ -14,15 +15,6 @@ type DevopsPlugin struct {
 	Logger hclog.Logger
 	Impl   Devops
 }
-
-// func (p *DevopsPlugin) Server(*plugin.MuxBroker) (interface{}, error) {
-// 	return &DevopsServerRPC{Impl: p.Impl}, nil
-// }
-
-// func (DevopsPlugin) Client(b *plugin.MuxBroker, c *rpc.Client) (interface{}, error) {
-// 	var _ Devops = &DevopsClientRPC{}
-// 	return &DevopsClientRPC{client: c}, nil
-// }
 
 func (p *DevopsPlugin) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
 	proto.RegisterDevopsServer(s, &GRPCServer{Impl: p.Impl, Logger: p.Logger})

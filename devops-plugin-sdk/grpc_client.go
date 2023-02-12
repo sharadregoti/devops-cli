@@ -1,12 +1,13 @@
-package shared
+package sdk
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
+
 	empty "github.com/golang/protobuf/ptypes/empty"
 	wrappers "github.com/golang/protobuf/ptypes/wrappers"
-	"github.com/sharadregoti/devops/proto"
 )
 
 type GRPCClient struct {

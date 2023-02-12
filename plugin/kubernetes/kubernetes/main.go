@@ -7,9 +7,9 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
+	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops/common"
 	pnk8s "github.com/sharadregoti/devops/plugin/kubernetes"
-	"github.com/sharadregoti/devops/shared"
 )
 
 // handshakeConfigs are used to just do a basic handshake between

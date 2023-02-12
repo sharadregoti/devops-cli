@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/antonmedv/expr"
+	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/proto"
 	"github.com/tidwall/gjson"
 )
 

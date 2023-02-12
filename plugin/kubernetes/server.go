@@ -9,7 +9,7 @@ package kubernetes
 // 	"github.com/hashicorp/go-plugin"
 
 // 	"github.com/sharadregoti/devops/common"
-// 	"github.com/sharadregoti/devops/shared"
+// 	shared "github.com/sharadregoti/devops-plugin-sdk"
 // )
 
 // // handshakeConfigs are used to just do a basic handshake between
