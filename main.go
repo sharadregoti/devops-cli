@@ -33,7 +33,7 @@ func getPluginPath(name, devopsDir string) string {
 	if common.Release {
 		return fmt.Sprintf("%s/plugins/%s/%s", devopsDir, name, name)
 	}
-	return fmt.Sprintf("../../plugin/%s/%s/%s", name, name, name)
+	return fmt.Sprintf("../../plugins/%s/%s/%s", name, name, name)
 }
 
 func ListPlugins() ([]string, error) {
