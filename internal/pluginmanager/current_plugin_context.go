@@ -1,4 +1,4 @@
-package core
+package pluginmanager
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/internal/transformer"
-	"github.com/sharadregoti/devops/internal/views"
+	"github.com/sharadregoti/devops/internal/tui"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
@@ -24,7 +24,7 @@ type CurrentPluginContext struct {
 
 	plugin shared.Devops
 
-	appView *views.Application
+	appView *tui.Application
 
 	authInfo            *proto.AuthInfoResponse
 	defaultIsolator     string

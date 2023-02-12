@@ -1,4 +1,4 @@
-package core
+package pluginmanager
 
 import (
 	"github.com/sharadregoti/devops-plugin-sdk/proto"

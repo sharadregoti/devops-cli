@@ -7,7 +7,7 @@ import (
 
 	middleware "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	core "github.com/sharadregoti/devops"
+	pm "github.com/sharadregoti/devops/internal/pluginmanager"
 	"github.com/sharadregoti/devops/server/handlers"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
@@ -15,11 +15,11 @@ import (
 
 // Server is the object which sets up the server and handles all server operations
 type Server struct {
-	sm *core.SessionManager
+	sm *pm.SessionManager
 }
 
 func New() (*Server, error) {
-	sm, err := core.NewSM()
+	sm, err := pm.NewSM()
 	if err != nil {
 		return nil, err
 	}

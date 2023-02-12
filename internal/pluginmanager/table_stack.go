@@ -1,4 +1,4 @@
-package core
+package pluginmanager
 
 import (
 	shared "github.com/sharadregoti/devops-plugin-sdk"

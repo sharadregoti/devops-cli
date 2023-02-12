@@ -10,7 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	core "github.com/sharadregoti/devops"
+	pm "github.com/sharadregoti/devops/internal/pluginmanager"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
@@ -32,7 +32,7 @@ func HandleConfig() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
 		defer cancel()
 
-		p, err := core.ListPlugins()
+		p, err := pm.ListPlugins()
 		if err != nil {
 			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
 			return
@@ -53,7 +53,7 @@ func HandleConfig() http.HandlerFunc {
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
 // @Router       /v1/info [get]
-func HandleAuth(sm *core.SessionManager) http.HandlerFunc {
+func HandleAuth(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
 		defer cancel()
@@ -61,7 +61,7 @@ func HandleAuth(sm *core.SessionManager) http.HandlerFunc {
 		params := mux.Vars(r)
 		pluginName := params["pluginName"]
 
-		auths, err := core.InitAndGetAuthInfo(pluginName)
+		auths, err := pm.InitAndGetAuthInfo(pluginName)
 		if err != nil {
 			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
 			return
@@ -82,7 +82,7 @@ func HandleAuth(sm *core.SessionManager) http.HandlerFunc {
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
 // @Router       /v1/info [get]
-func HandleInfo(sm *core.SessionManager) http.HandlerFunc {
+func HandleInfo(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
 		defer cancel()
@@ -118,7 +118,7 @@ func HandleInfo(sm *core.SessionManager) http.HandlerFunc {
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
 // @Router       /v1/events/{id} [post]
-func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
+func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
 		defer cancel()
@@ -232,7 +232,7 @@ func HandleEvent(sm *core.SessionManager) http.HandlerFunc {
 				return
 
 			case model.ResourceTypeChanged:
-				
+
 				if pCtx.ResourceChanged(e); err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
@@ -296,7 +296,7 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     utils.CreateCorsObject().OriginAllowed,
 }
 
-func HandleWebsocket(sm *core.SessionManager) http.HandlerFunc {
+func HandleWebsocket(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -340,7 +340,7 @@ func HandleWebsocket(sm *core.SessionManager) http.HandlerFunc {
 	}
 }
 
-func HandleActionWebsocket(sm *core.SessionManager) http.HandlerFunc {
+func HandleActionWebsocket(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		conn, err := upgrader.Upgrade(w, r, nil)

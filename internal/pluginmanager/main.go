@@ -1,4 +1,4 @@
-package core
+package pluginmanager
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/common"
-	"github.com/sharadregoti/devops/internal/views"
+	"github.com/sharadregoti/devops/internal/tui"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils/logger"
 )
@@ -21,13 +21,6 @@ import (
 // Downloading:  80%
 
 // var release bool = false
-
-type addHelper struct{}
-
-func (*addHelper) SendData(a interface{}) error {
-	logger.LogDebug("HI send data from core binary was called")
-	return nil
-}
 
 func getPluginPath(name, devopsDir string) string {
 	if common.Release {
@@ -129,7 +122,7 @@ func Start(isTest bool, authInfo *proto.AuthInfo) (*CurrentPluginContext, error)
 func StartTUI() error {
 	logger.InitClientLogging()
 
-	app, err := views.NewApplication("localhost:3000")
+	app, err := tui.NewApplication("localhost:3000")
 	if err != nil {
 		return err
 	}
