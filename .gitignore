@@ -15,8 +15,8 @@
 # vendor/
 cmd/devops/devops
 plugin/plugin
-plugin/kubernetes/kubernetes/kubernetes
-plugin/aws/aws/aws
+plugins/kubernetes/kubernetes/kubernetes
+plugins/aws/aws/aws
 frontend/devops
 
 *.csv
