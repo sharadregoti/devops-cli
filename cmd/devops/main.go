@@ -156,9 +156,23 @@ func NewInitCommand() *cobra.Command {
 
 func NewTUICommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:    "tui",
-		Short:  "Starts TUI interface",
-		PreRun: func(cmd *cobra.Command, args []string) {},
+		Use:   "tui",
+		Short: "Starts TUI interface",
+		PreRun: func(cmd *cobra.Command, args []string) {
+			viper.AutomaticEnv()
+			// When using environment variables, replace . with _ and - with _
+			viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
+
+			f := cmd.Flags()
+			// When using configuration files, replace - with _
+			normalizeFunc := f.GetNormalizeFunc()
+			f.SetNormalizeFunc(func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
+				result := normalizeFunc(fs, name)
+				name = strings.ReplaceAll(string(result), "-", "_")
+				return pflag.NormalizedName(name)
+			})
+			viper.BindPFlags(f)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return tui.Start(viper.GetString("address"))
 		},

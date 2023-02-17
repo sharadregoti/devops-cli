@@ -27,7 +27,7 @@ const _ = grpc.SupportPackageIsVersion7
 type DevopsClient interface {
 	Name(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*wrappers.StringValue, error)
 	GetResources(ctx context.Context, in *GetResourcesArgs, opts ...grpc.CallOption) (*_struct.ListValue, error)
-	WatchResources(ctx context.Context, in *wrappers.StringValue, opts ...grpc.CallOption) (Devops_WatchResourcesClient, error)
+	WatchResources(ctx context.Context, in *GetResourcesArgs, opts ...grpc.CallOption) (Devops_WatchResourcesClient, error)
 	CloseResourceWatcher(ctx context.Context, in *wrappers.StringValue, opts ...grpc.CallOption) (*empty.Empty, error)
 	GetResourceTypeSchema(ctx context.Context, in *wrappers.StringValue, opts ...grpc.CallOption) (*ResourceTransformer, error)
 	GetResourceTypeList(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetResourceTypeListResponse, error)
@@ -69,7 +69,7 @@ func (c *devopsClient) GetResources(ctx context.Context, in *GetResourcesArgs, o
 	return out, nil
 }
 
-func (c *devopsClient) WatchResources(ctx context.Context, in *wrappers.StringValue, opts ...grpc.CallOption) (Devops_WatchResourcesClient, error) {
+func (c *devopsClient) WatchResources(ctx context.Context, in *GetResourcesArgs, opts ...grpc.CallOption) (Devops_WatchResourcesClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Devops_ServiceDesc.Streams[0], "/proto.Devops/WatchResources", opts...)
 	if err != nil {
 		return nil, err
@@ -224,7 +224,7 @@ func (c *devopsClient) PerformSpecificAction(ctx context.Context, in *SpecificAc
 type DevopsServer interface {
 	Name(context.Context, *empty.Empty) (*wrappers.StringValue, error)
 	GetResources(context.Context, *GetResourcesArgs) (*_struct.ListValue, error)
-	WatchResources(*wrappers.StringValue, Devops_WatchResourcesServer) error
+	WatchResources(*GetResourcesArgs, Devops_WatchResourcesServer) error
 	CloseResourceWatcher(context.Context, *wrappers.StringValue) (*empty.Empty, error)
 	GetResourceTypeSchema(context.Context, *wrappers.StringValue) (*ResourceTransformer, error)
 	GetResourceTypeList(context.Context, *empty.Empty) (*GetResourceTypeListResponse, error)
@@ -251,7 +251,7 @@ func (UnimplementedDevopsServer) Name(context.Context, *empty.Empty) (*wrappers.
 func (UnimplementedDevopsServer) GetResources(context.Context, *GetResourcesArgs) (*_struct.ListValue, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetResources not implemented")
 }
-func (UnimplementedDevopsServer) WatchResources(*wrappers.StringValue, Devops_WatchResourcesServer) error {
+func (UnimplementedDevopsServer) WatchResources(*GetResourcesArgs, Devops_WatchResourcesServer) error {
 	return status.Errorf(codes.Unimplemented, "method WatchResources not implemented")
 }
 func (UnimplementedDevopsServer) CloseResourceWatcher(context.Context, *wrappers.StringValue) (*empty.Empty, error) {
@@ -343,7 +343,7 @@ func _Devops_GetResources_Handler(srv interface{}, ctx context.Context, dec func
 }
 
 func _Devops_WatchResources_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(wrappers.StringValue)
+	m := new(GetResourcesArgs)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

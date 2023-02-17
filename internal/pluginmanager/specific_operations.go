@@ -211,6 +211,9 @@ func (c *CurrentPluginContext) getTemplateParams(e model.Event) (map[string]inte
 		"resourceName": e.ResourceName,
 		"resourceType": e.ResourceType,
 		"isolatorName": e.IsolatorName,
+		"authPath":     c.authInfo.Path,
+		"authName":     c.authInfo.Name,
+		"authId":       c.authInfo.IdentifyingName,
 		"resource":     res,
 		"args":         e.Args,
 	}

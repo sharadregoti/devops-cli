@@ -45,20 +45,20 @@ func (g *GRPCServer) GetResources(ctx context.Context, args *proto.GetResourcesA
 	return result, nil
 }
 
-func (g *GRPCServer) WatchResources(sw *wrappers.StringValue, server proto.Devops_WatchResourcesServer) error {
+func (g *GRPCServer) WatchResources(args *proto.GetResourcesArgs, server proto.Devops_WatchResourcesServer) error {
 	// fmt package does not work here. Only log, hclog works
-	ch, done, err := g.Impl.WatchResources(sw.Value)
+	ch, done, err := g.Impl.WatchResources(args)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("grpc server routine: resource watcher has been started for resource type (%s)", sw.Value)
-	defer log.Printf("grpc server routine: resource watcher has been stopped for resource type (%s)", sw.Value)
+	log.Printf("grpc server routine: resource watcher has been started for resource type (%s)", args.ResourceType)
+	defer log.Printf("grpc server routine: resource watcher has been stopped for resource type (%s)", args.ResourceType)
 
 	for {
 		select {
 		case <-done:
-			log.Printf("grpc server resource watcher routine: Done received for resource type (%s)", sw.Value)
+			log.Printf("grpc server resource watcher routine: Done received for resource type (%s)", args.ResourceType)
 			return nil
 
 		case v := <-ch:

@@ -196,7 +196,8 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 				return
 
 			case model.IsolatorChanged:
-				if pCtx.ReadSync(e); err != nil {
+
+				if pCtx.ResourceChanged(e); err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}

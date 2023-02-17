@@ -4,6 +4,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/sharadregoti/devops/model"
+	"github.com/sharadregoti/devops/utils/logger"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -12,7 +13,7 @@ type MainView struct {
 	view *tview.Table
 }
 
-func NewMainView() *MainView {
+func NewTableView() *MainView {
 	table := tview.NewTable().SetFixed(0, 0)
 	table.SetBorder(true).SetBorderAttributes(tcell.AttrDim).SetTitle("Table")
 	table.SetSelectable(true, false)
@@ -32,16 +33,12 @@ func NewMainView() *MainView {
 	}
 }
 
-func (m *MainView) GetView() *tview.Table {
-	return m.view
-}
-
 func (m *MainView) SetTitle(title string) {
-	m.GetView().SetTitle(cases.Title(language.AmericanEnglish).String(title))
+	m.view.SetTitle(cases.Title(language.AmericanEnglish).String(title))
 }
 
 func (m *MainView) Refresh(data []*model.TableRow, rowNum int) {
-	m.GetView().Clear()
+	m.view.Clear()
 
 	for r, cols := range data {
 		for c, col := range cols.Data {
@@ -54,7 +51,51 @@ func (m *MainView) Refresh(data []*model.TableRow, rowNum int) {
 			m.SetCell(r, c, col, getColor(cols.Color))
 		}
 	}
-	m.GetView().Select(rowNum, 0)
+	m.view.Select(rowNum, 0)
+}
+
+func (m *MainView) GetRowNum(id string) int {
+	for r := 0; r < m.view.GetRowCount(); r++ {
+		// 1 is always the id column
+		if m.view.GetCell(r, 1).Text == id {
+			return r
+		}
+	}
+	return -1
+}
+
+func (m *MainView) SetHeader(d *model.TableRow) {
+	for i, colValue := range d.Data {
+		m.SetCell(0, i, colValue, getColor("white"))
+	}
+}
+
+func (m *MainView) AddRow(d *model.TableRow) {
+	currentRowCount := m.view.GetRowCount()
+	for i, colValue := range d.Data {
+		m.SetCell(currentRowCount, i, colValue, getColor(d.Color))
+	}
+}
+
+func (m *MainView) UpdateRow(d *model.TableRow) {
+	row := m.GetRowNum(d.Data[1])
+	if row <= 0 {
+		logger.LogDebug("Update row, row not found for id: (%s)", d.Data[1])
+		return
+	}
+	logger.LogDebug("Updating row number (%d) with id (%s)", row, d.Data[1])
+	for i, colValue := range d.Data {
+		m.SetCell(row, i, colValue, getColor(d.Color))
+	}
+}
+
+func (m *MainView) DeleteRow(d *model.TableRow) {
+	row := m.GetRowNum(d.Data[1])
+	if row <= 0 {
+		logger.LogDebug("Delete row, row not found for id: (%s)", d.Data[1])
+		return
+	}
+	m.view.RemoveRow(row)
 }
 
 func (m *MainView) SetHeaderCell(x, y int, text string) {

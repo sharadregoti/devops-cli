@@ -65,6 +65,7 @@ message AuthInfo {
   bool is_default = 3;
   repeated string default_isolators = 4;
   map<string, string> info = 5;
+  string path = 6;
 }
 
 message AuthInfoResponse {
@@ -138,7 +139,7 @@ service Devops {
   rpc Name (google.protobuf.Empty) returns (google.protobuf.StringValue);
 
   rpc GetResources (GetResourcesArgs) returns (google.protobuf.ListValue);
-  rpc WatchResources (google.protobuf.StringValue) returns (stream WatchResourceResult);
+  rpc WatchResources (GetResourcesArgs) returns (stream WatchResourceResult);
   rpc CloseResourceWatcher (google.protobuf.StringValue) returns (google.protobuf.Empty);
   rpc GetResourceTypeSchema (google.protobuf.StringValue) returns (ResourceTransformer);
 

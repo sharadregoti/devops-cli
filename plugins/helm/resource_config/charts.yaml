@@ -1,0 +1,24 @@
+# For a chart (helm show)
+# You can show what resources it will create.
+# View chart info
+# View readme
+# Show default values
+# Custom CRDs
+operations:
+  - name: "namespace"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "name"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "url"
+    json_paths: 
+    - path: ""
+    output_format: ""
+styles:
+  - row_background_color: lightskyblue
+    conditions:
+    - 'true'
+specific_actions:

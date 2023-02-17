@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/rivo/tview"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 )
@@ -12,7 +14,7 @@ type SpecificActions struct {
 
 func NewSpecificAction() *SpecificActions {
 	t := tview.NewTextView()
-	t.SetBorder(true)
+	// t.SetBorder(true)
 	t.SetTitle("Specific Actions")
 
 	return &SpecificActions{
@@ -27,8 +29,10 @@ func (g *SpecificActions) GetView() *tview.TextView {
 func (g *SpecificActions) RefreshActions(data []*proto.Action) {
 	temp := map[string]string{}
 	for _, sa := range data {
-		temp[sa.KeyBinding] = sa.Name
+		temp[fmt.Sprintf("<%s>", sa.KeyBinding)] = sa.Name
 	}
-	g.view.SetText(createKeyValuePairsWithBrackets(temp))
+	// g.view.SetText(createKeyValuePairsWithBrackets(temp))
+	// TODO: This can be expensive
+	g.view.SetText(getNiceFormat(temp))
 	g.actions = data
 }

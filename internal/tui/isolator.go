@@ -3,23 +3,26 @@ package tui
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 
 	"github.com/rivo/tview"
 )
 
 type IsolatorView struct {
 	view          *tview.TextView
-	currentKeyMap []string
+	currentKeyMap map[string]string
+	requiredIs    []string
 }
 
 func NewIsolatorView() *IsolatorView {
 	t := tview.NewTextView()
-	t.SetBorder(true)
+	// t.SetBorder(true)
 	t.SetTitle("Isolator")
 
 	v := &IsolatorView{
 		view:          t,
-		currentKeyMap: make([]string, 0),
+		currentKeyMap: make(map[string]string),
+		requiredIs:    []string{},
 	}
 
 	// t.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -51,8 +54,13 @@ func (g *IsolatorView) SetTitle(data string) {
 
 func (g *IsolatorView) SetDefault(data []string) {
 	g.view.Clear()
-	g.currentKeyMap = data
-	g.view.SetText(createKeyValuePairsIsolator(data))
+	// convert data to map
+	tempMap := make(map[string]string)
+	for i, v := range data {
+		tempMap[fmt.Sprintf("%d", i)] = v
+	}
+	g.currentKeyMap = tempMap
+	g.view.SetText(getNiceFormat(tempMap))
 }
 
 func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
@@ -67,16 +75,33 @@ func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
 		}
 	}
 
-	// Insert the element at specific index, shift remaining by 1
-	g.currentKeyMap = append(g.currentKeyMap[:1], append([]string{isolatorName}, g.currentKeyMap[1:]...)...)
+	if len(g.currentKeyMap) == 8 {
+		// Remove the first element
+		index := len(g.requiredIs)
+		newMap := map[string]string{}
 
-	limit := 3
-	if len(g.currentKeyMap) > limit {
-		// Cut off extra keys
-		g.currentKeyMap = g.currentKeyMap[:limit]
+		for k, v := range g.currentKeyMap {
+			i, _ := strconv.Atoi(k)
+			if i < index {
+				continue
+			}
+			newMap[fmt.Sprintf("%d", i+1)] = v
+		}
+		newMap[fmt.Sprintf("%d", index)] = isolatorName
+	} else {
+		g.currentKeyMap[fmt.Sprintf("%d", len(g.currentKeyMap))] = isolatorName
 	}
 
-	g.view.SetText(createKeyValuePairsIsolator(g.currentKeyMap))
+	// Insert the element at specific index, shift remaining by 1
+	// g.currentKeyMap = append(g.currentKeyMap[:1], append([]string{isolatorName}, g.currentKeyMap[1:]...)...)
+
+	// limit := 5
+	// if len(g.currentKeyMap) > limit {
+	// 	// Cut off extra keys
+	// 	g.currentKeyMap = g.currentKeyMap[:limit]
+	// }
+
+	g.view.SetText(getNiceFormat(g.currentKeyMap))
 }
 
 func createKeyValuePairsIsolator(m []string) string {

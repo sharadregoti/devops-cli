@@ -28,9 +28,6 @@ func init() {
 
 	fileWriter = file
 	Loggero, Loggerf = createLoggers(file)
-	// Loggerf.Info("Yikes 2")
-	// Loggerf.Debug("Yikes")
-	// Loggerf.Error("Yikes 3")
 }
 
 func InitClientLogging() {
@@ -77,8 +74,9 @@ func getCoreLogFile(filePath string) (*os.File, error) {
 		}
 		return file, nil
 	}
+
 	// If file exists, open it
-	file, err := os.OpenFile(filePath, os.O_RDWR, 0644)
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err
 	}

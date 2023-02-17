@@ -13,7 +13,7 @@ type GeneralInfo struct {
 
 func NewGeneralInfo() *GeneralInfo {
 	t := tview.NewTextView()
-	t.SetBorder(true)
+	// t.SetBorder(true)
 	t.SetTitle("General Info")
 
 	return &GeneralInfo{
@@ -27,7 +27,8 @@ func (g *GeneralInfo) GetView() *tview.TextView {
 
 func (g *GeneralInfo) Refresh(data map[string]string) {
 	g.view.Clear()
-	g.view.SetText(createKeyValuePairsWithoutBrackets(data))
+	// g.view.SetText(createKeyValuePairsWithoutBrackets(data))
+	g.view.SetText(getNiceFormat(data))
 }
 
 func createKeyValuePairsWithoutBrackets(m map[string]string) string {

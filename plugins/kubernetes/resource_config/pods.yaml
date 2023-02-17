@@ -18,7 +18,7 @@ operations:
     output_format: ""
   - name: "status"
     json_paths: 
-    - path: "customCalculatedStatus"
+    - path: "devops.customCalculatedStatus"
     output_format: ""
   - name: "ip"
     json_paths: 
@@ -43,22 +43,22 @@ nesting:
 styles:
   - row_background_color: darkorange
     conditions:
-    - 'customCalculatedStatus == "Pending"'
+    - 'devops.customCalculatedStatus == "Pending"'
   - row_background_color: white
     conditions:
-    - 'customCalculatedStatus == "ContainerCreating" || customCalculatedStatus == "PodInitializing"'
+    - 'devops.customCalculatedStatus == "ContainerCreating" || devops.customCalculatedStatus == "PodInitializing"'
   - row_background_color: aqua
     conditions:
-    - 'customCalculatedStatus == "Initialized"'
+    - 'devops.customCalculatedStatus == "Initialized"'
   - row_background_color: gray
     conditions:
-    - 'customCalculatedStatus == "Completed"'
+    - 'devops.customCalculatedStatus == "Completed"'
   - row_background_color: lightskyblue
     conditions:
-    - 'customCalculatedStatus == "Running"'
+    - 'devops.customCalculatedStatus == "Running"'
   - row_background_color: mediumpurple
     conditions:
-    - 'customCalculatedStatus == "Terminating"'
+    - 'devops.customCalculatedStatus == "Terminating"'
   - row_background_color: red
     conditions:
     - 'true'
@@ -66,24 +66,32 @@ specific_actions:
   - name: "describe"
     key_binding: "d"
     execution:
-      cmd: "kubectl describe {{.resourceType}} {{.resourceName}} -n {{.isolatorName}}"
+      cmd: |
+        #!/bin/bash
+        kubectl describe {{.resourceType}} {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --context {{.authName}}
     output_type: "string"
   - name: "logs"
     key_binding: "l"
     execution:
-      cmd: "kubectl logs {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -f"
+      cmd: |
+        #!/bin/bash
+        kubectl logs {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -f --kubeconfig {{.authPath}} --context {{.authName}}
     output_type: "stream"
   - name: "shell"
     key_binding: "s"
     execution:
-      cmd: 'kubectl exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh'
-      # cmd: 'kubectl exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh -c "command -v bash >/dev/null && exec bash || exec sh"'
+      cmd: |
+        #!/bin/bash
+        kubectl --kubeconfig {{.authPath}} --context {{.authName}} exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh -c "command -v bash >/dev/null && exec bash || exec sh"
+        # kubectl exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh
     output_type: "bidirectional"
   - name: "port-forward"
     key_binding: "f"
     output_type: "nothing"
     execution:
-      cmd: "kubectl port-forward {{.resourceName}} -n {{.isolatorName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}"
+      cmd: |
+        #!/bin/bash
+        kubectl port-forward {{.resourceName}} -n {{.isolatorName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}
       is_long_running: true
       user_input:
         required: true

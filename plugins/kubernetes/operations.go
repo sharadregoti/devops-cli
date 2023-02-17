@@ -1,4 +1,4 @@
-package kubernetes
+package main
 
 import (
 	"context"
@@ -377,7 +377,9 @@ func (d *Kubernetes) listResources(ctx context.Context, args *proto.GetResources
 			// 	return nil, shared.LogError(// 	common.Error(d.logger, fmt.Sprintf("failed to unstructure resource: %v", err)))
 			// }
 			// rawJson["customCalculatedStatus"] = Phase(&po)
-			rawJson["customCalculatedStatus"] = Phase(obj.(*v1.Pod))
+			rawJson["devops"] = map[string]interface{}{
+				"customCalculatedStatus": Phase(obj.(*v1.Pod)),
+			}
 		}
 		result = append(result, rawJson)
 	}

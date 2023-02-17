@@ -1,4 +1,4 @@
-package kubernetes
+package main
 
 import (
 	"fmt"
@@ -18,6 +18,13 @@ import (
 )
 
 var release bool = false
+
+func getConfigPath(devopsDir string) string {
+	if release {
+		return devopsDir + "/plugins/kubernetes"
+	}
+	return "../../plugins/kubernetes"
+}
 
 func getSchemaPath(devopsDir string) string {
 	if release {
@@ -123,7 +130,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = res
 	}
 
-	data, err := os.ReadFile(schemaPath + "/" + "config.yaml")
+	data, err := os.ReadFile(getConfigPath(devopsDir) + "/" + "config.yaml")
 	if err != nil {
 		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read config.yaml file %s: %w", "config.yaml", err)
 	}

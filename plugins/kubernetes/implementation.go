@@ -1,4 +1,4 @@
-package kubernetes
+package main
 
 import (
 	"context"
@@ -40,6 +40,7 @@ func (d *Kubernetes) Connect(authInfo *proto.AuthInfo) error {
 		}
 	}
 
+	shared.LogDebug("Connecting to kubernetes cluster at path %s with context %s", kubeConfigPath, authInfo.Name)
 	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 	if err != nil {
 		return err
@@ -143,7 +144,7 @@ func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 }
 
 // TODO: test & fix this
-func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResourceResult, chan struct{}, error) {
+func (d *Kubernetes) WatchResources(args *proto.GetResourcesArgs) (chan shared.WatchResourceResult, chan struct{}, error) {
 	if len(d.resourceWatcherChanMap) > 0 {
 		for k, v := range d.resourceWatcherChanMap {
 			d.logger.Trace(fmt.Sprintf("Invoking close resource watcher event for resource type %s", k))
@@ -153,37 +154,37 @@ func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResou
 		d.resourceWatcherChanMap = make(map[string]channels)
 	}
 
-	_, ok := d.resourceWatcherChanMap[resourceType]
+	_, ok := d.resourceWatcherChanMap[args.ResourceType]
 	if ok {
-		d.logger.Debug(fmt.Sprintf("Channel already exists for resource %s", resourceType))
+		d.logger.Debug(fmt.Sprintf("Channel already exists for resource %s", args.ResourceType))
 		return nil, nil, nil
 	}
 
-	watcher, err := d.watchResourceDynamic(context.Background(), &proto.GetResourcesArgs{ResourceType: resourceType, IsolatorId: "default"})
+	watcher, err := d.watchResourceDynamic(context.Background(), args)
 	if err != nil {
-		return nil, nil, shared.LogError("failed to watch over resource %s: %v", resourceType, err)
+		return nil, nil, shared.LogError("failed to watch over resource %s: %v", args.ResourceType, err)
 	}
 
 	watcherDone := make(chan struct{}, 1)
 	serverDone := make(chan struct{}, 1)
 	ch := make(chan shared.WatchResourceResult, 1)
 	go func() {
-		shared.LogDebug("plugin routine: resource watcher has been started for resource type (%s)", resourceType)
-		defer shared.LogDebug("plugin routine: resource watcher has been stopped for resource type (%s)", resourceType)
+		shared.LogDebug("plugin routine: resource watcher has been started for resource type (%s)", args.ResourceType)
+		defer shared.LogDebug("plugin routine: resource watcher has been stopped for resource type (%s)", args.ResourceType)
 
 		for {
 			select {
 			case <-watcherDone:
-				shared.LogTrace("plugin routine: Done received for resource type (%s)", resourceType)
+				shared.LogTrace("plugin routine: Done received for resource type (%s)", args.ResourceType)
 				return
 
 			case event, ok := <-watcher.ResultChan():
 				if !ok {
-					shared.LogDebug("Watcher routine: Watcher channel closed for resource %s", resourceType)
+					shared.LogDebug("Watcher routine: Watcher channel closed for resource %s", args.ResourceType)
 					return
 				}
 
-				shared.LogTrace("Watcher routine: got event for resource type (%s), event type (%s)", resourceType, strings.ToLower(string(event.Type)))
+				shared.LogTrace("Watcher routine: got event for resource type (%s), event type (%s)", args.ResourceType, strings.ToLower(string(event.Type)))
 
 				b, err := json.Marshal(event.Object)
 				if err != nil {
@@ -200,14 +201,15 @@ func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResou
 				meta := rawJson["metadata"].(map[string]interface{})
 				delete(meta, "managedFields")
 				rawJson["metadata"] = meta
-				if resourceType == "pods" {
+				if args.ResourceType == "pods" {
 					obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(b, nil, nil)
 					if err != nil {
 						shared.LogError("Watcher routine: failed to unstructure resource: %v", err)
 						return
 					}
-					rawJson["customCalculatedStatus"] = Phase(obj.(*v1.Pod))
-
+					rawJson["devops"] = map[string]interface{}{
+						"customCalculatedStatus": Phase(obj.(*v1.Pod)),
+					}
 				}
 
 				ch <- shared.WatchResourceResult{
@@ -219,7 +221,7 @@ func (d *Kubernetes) WatchResources(resourceType string) (chan shared.WatchResou
 
 	}()
 
-	d.resourceWatcherChanMap[resourceType] = channels{watcherDone: watcherDone, serverDone: serverDone}
+	d.resourceWatcherChanMap[args.ResourceType] = channels{watcherDone: watcherDone, serverDone: serverDone}
 	return ch, serverDone, nil
 }
 
@@ -261,14 +263,19 @@ func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
 func (d *Kubernetes) GetAuthInfo() (*proto.AuthInfoResponse, error) {
 	authInfo := new(proto.AuthInfoResponse)
 
+	shared.LogDebug("GetAuthInfo Called")
+
 	for _, kc := range d.kubeCLIconfig.KubeConfigs {
+		shared.LogDebug("Path Is ==== %s", kc.Path)
 		for _, c := range kc.Contexts {
+			shared.LogDebug("Path is ==== Love %s %s", kc.Path, c.Name)
 			authInfo.AuthInfo = append(authInfo.AuthInfo, &proto.AuthInfo{
 				IdentifyingName:  kc.Name,
 				Name:             c.Name,
 				DefaultIsolators: c.DefaultNamespacesToShow,
 				IsDefault:        c.IsDefault,
 				Info:             map[string]string{},
+				Path:             kc.Path,
 			})
 		}
 	}
@@ -326,11 +333,11 @@ func (d *Kubernetes) GetSupportedActions() (*proto.GetActionListResponse, error)
 				KeyBinding: "ctrl-d",
 				OutputType: "nothing",
 			},
-			{
-				Name:       "refresh",
-				KeyBinding: "ctrl-r",
-				OutputType: "nothing",
-			},
+			// {
+			// 	Name:       "refresh",
+			// 	KeyBinding: "ctrl-r",
+			// 	OutputType: "nothing",
+			// },
 		},
 	}
 

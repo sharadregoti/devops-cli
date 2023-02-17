@@ -77,6 +77,7 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 			requiredAuthInfo.Info = map[string]string{
 				"name":    ai.IdentifyingName,
 				"context": ai.Name,
+				"plugin":  pluginName,
 			}
 			break
 		}
@@ -130,7 +131,7 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 	}
 
 	// start default watcher
-	ch, _, err := p.WatchResources(defaultIsolatorType)
+	ch, _, err := p.WatchResources(&proto.GetResourcesArgs{ResourceType: defaultIsolatorType, IsolatorId: isolator})
 	if err != nil {
 		return nil, logger.LogError("Error while starting watcher", err)
 	}

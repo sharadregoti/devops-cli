@@ -21,7 +21,7 @@ type GetResourcesArgs struct {
 
 type MainBox interface {
 	GetResources(args *proto.GetResourcesArgs) ([]interface{}, error)
-	WatchResources(resourceType string) (chan WatchResourceResult, chan struct{}, error)
+	WatchResources(args *proto.GetResourcesArgs) (chan WatchResourceResult, chan struct{}, error)
 	CloseResourceWatcher(resourceType string) error
 	GetResourceTypeSchema(resourceType string) (*proto.ResourceTransformer, error)
 }

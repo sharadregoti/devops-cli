@@ -35,8 +35,8 @@ func (g *GRPCClient) GetResources(args *proto.GetResourcesArgs) ([]interface{}, 
 	return resp, nil
 }
 
-func (g *GRPCClient) WatchResources(resourceType string) (chan WatchResourceResult, chan struct{}, error) {
-	resp, err := g.client.WatchResources(context.Background(), &wrappers.StringValue{Value: resourceType})
+func (g *GRPCClient) WatchResources(args *proto.GetResourcesArgs) (chan WatchResourceResult, chan struct{}, error) {
+	resp, err := g.client.WatchResources(context.Background(), args)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,13 +45,13 @@ func (g *GRPCClient) WatchResources(resourceType string) (chan WatchResourceResu
 	done := make(chan struct{}, 1)
 	// TODO: We cannot close the go routine. As resp.Recv() is blocking call & break only when the plugin exits
 	go func() {
-		fmt.Printf("grpc client routine: resource watcher has been started for resource type (%s)\n", resourceType)
-		defer fmt.Printf("grpc client routine: resource watcher has been stopped for resource type (%s)\n", resourceType)
+		fmt.Printf("grpc client routine: resource watcher has been started for resource type (%s)\n", args.ResourceType)
+		defer fmt.Printf("grpc client routine: resource watcher has been stopped for resource type (%s)\n", args.ResourceType)
 
 		for {
 			select {
 			case <-done:
-				fmt.Printf("grpc client routine: resource watcher Done received for resource type (%s)", resourceType)
+				fmt.Printf("grpc client routine: resource watcher Done received for resource type (%s)", args.ResourceType)
 				return
 
 			default:
@@ -59,7 +59,7 @@ func (g *GRPCClient) WatchResources(resourceType string) (chan WatchResourceResu
 				res, err := resp.Recv()
 				if err != nil {
 					// done <- struct{}{}
-					fmt.Printf("grpc client routine: Error while watching resource for type (%s) got error: %s\n", resourceType, err)
+					fmt.Printf("grpc client routine: Error while watching resource for type (%s) got error: %s\n", args.ResourceType, err)
 					return
 				}
 

@@ -40,5 +40,7 @@ specific_actions:
   - name: "describe"
     key_binding: "d"
     execution:
-      cmd: "kubectl describe {{.resourceType}} {{.resourceName}} -n {{.isolatorName}}"
+      cmd: |
+        #!/bin/bash
+        kubectl describe {{.resourceType}} {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --context {{.authName}}
     output_type: "string"

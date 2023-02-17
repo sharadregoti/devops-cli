@@ -41,11 +41,11 @@ func (s *SearchView) SetResourceTypes(arr []string) {
 		}
 
 		matches := fuzzy.Matches{}
-		if strings.HasPrefix(currentText, "@") {
-			matches = fuzzy.Find(strings.ToLower(currentText), []string{"@default", "@xlr8s-dev"})
-		} else {
-			matches = fuzzy.Find(strings.ToLower(currentText), arr)
-		}
+		// if strings.HasPrefix(currentText, "@") {
+		// 	matches = fuzzy.Find(strings.ToLower(currentText), []string{"@default", "@xlr8s-dev"})
+		// } else {
+		matches = fuzzy.Find(strings.ToLower(currentText), arr)
+		// }
 
 		for _, v := range matches {
 			entries = append(entries, v.Str)

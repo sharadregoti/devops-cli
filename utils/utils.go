@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -25,13 +26,35 @@ func ParseTableTitle(title string) (string, string) {
 }
 
 func ExecuteCMDGetOutput(cmdStr string) (string, error) {
-	// Set the command to execute
-	arr := strings.Split(cmdStr, " ")
-
-	// Execute the command
-	output, err := exec.Command(arr[0], arr[1:]...).Output()
+	// create a temporary file
+	f, err := ioutil.TempFile("", "script")
 	if err != nil {
-		return "", logger.LogError("Error while executing command %v: %s", arr, err)
+		// handle error
+		return "", logger.LogError("failed to create temp file: Error ", err)
+	}
+	defer os.Remove(f.Name()) // delete the file when we're done
+
+	// write the script to the file
+	_, err = f.WriteString(cmdStr)
+	if err != nil {
+		// handle error
+		f.Close()
+		return "", logger.LogError("failed to write data in temp file: Error ", err)
+	}
+	f.Close()
+
+	// make the file executable
+	err = os.Chmod(f.Name(), 0777)
+	if err != nil {
+		// handle error
+		return "", logger.LogError("failed to make the temp file executable: Error ", err)
+	}
+
+	// Set the command to execute
+	// Execute the command
+	output, err := exec.Command(f.Name()).Output()
+	if err != nil {
+		return "", logger.LogError("Error while executing command\n %v\n: %s", cmdStr, err)
 	}
 
 	return string(output), nil
@@ -53,9 +76,32 @@ func ExecuteCMDLong(cmdStr string) error {
 func ExecuteCMD(cmdStr string) error {
 	// Create arbitrary command.
 
-	arr := strings.Split(cmdStr, " ")
+	// arr := strings.Split(cmdStr, " ")
+	// create a temporary file
+	f, err := ioutil.TempFile("", "script")
+	if err != nil {
+		// handle error
+		return logger.LogError("failed to create temp file: Error ", err)
+	}
+	defer os.Remove(f.Name()) // delete the file when we're done
 
-	c := exec.Command(arr[0], arr[1:]...)
+	// write the script to the file
+	_, err = f.WriteString(cmdStr)
+	if err != nil {
+		// handle error
+		f.Close()
+		return logger.LogError("failed to write data in temp file: Error ", err)
+	}
+	f.Close()
+
+	// make the file executable
+	err = os.Chmod(f.Name(), 0777)
+	if err != nil {
+		// handle error
+		return logger.LogError("failed to make the temp file executable: Error ", err)
+	}
+
+	c := exec.Command(f.Name())
 
 	// Start the command with a pty.
 	ptmx, err := pty.Start(c)

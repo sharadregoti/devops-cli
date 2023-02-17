@@ -19,7 +19,7 @@ func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
 		return err
 	}
 
-	ch, _, err := c.plugin.WatchResources(e.ResourceType)
+	ch, _, err := c.plugin.WatchResources(&proto.GetResourcesArgs{ResourceType: e.ResourceType, IsolatorId: e.IsolatorName})
 	if err != nil {
 		return logger.LogError("Error while starting watcher", err)
 	}
@@ -43,7 +43,7 @@ func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
 				}
 
 				logger.LogTrace("Received new resource from core binary (%v)", r)
-				
+
 				tableData, _, err := transformer.GetResourceInTableFormat(schema, []interface{}{r.Result})
 				if err != nil {
 					return
@@ -126,7 +126,9 @@ func (c *CurrentPluginContext) Read(e model.Event) (map[string]interface{}, erro
 	}
 	if len(resources) == 0 {
 		logger.LogDebug("Resource is zero")
+		return map[string]interface{}{}, nil
 	}
+	delete(resources[0].(map[string]interface{}), "devops")
 	return resources[0].(map[string]interface{}), nil
 }
 
