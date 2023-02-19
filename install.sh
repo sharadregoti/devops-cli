@@ -195,7 +195,7 @@ cleanup() {
 }
 
 installCompleted() {
-    echo -e "\nTo get started with Space Cloud, please visit https://github.com/sharadregoti/devops-cli"
+    echo -e "\nTo get started with Devops CLI, please visit https://github.com/sharadregoti/devops-cli"
 }
 
 # -----------------------------------------------------------------------------

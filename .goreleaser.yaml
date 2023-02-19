@@ -12,8 +12,9 @@ builds:
       - darwin
   - id: devops-kubernetes-plugin
     flags:
-    - -tags=release  
-    main: ./plugin/kubernetes/kubernetes
+    - -tags=release
+    - -o kubernetes
+    main: ./plugin/kubernetes
     binary: kubernetes
     goos:
       - linux
@@ -33,6 +34,10 @@ archives:
       # windows: Windows
       386: i386
       amd64: x86_64
+    files:
+      - src: ./cmd/devops/config.yaml
+        dst: config.yaml
+        strip_parent: true
   - builds:
     - devops-kubernetes-plugin
     id: devops-kubernetes-plugin
@@ -40,6 +45,9 @@ archives:
     files:
       - src: plugin/kubernetes/resource_config
         dst: resource_config
+        strip_parent: true
+      - src: plugin/kubernetes/config.yaml
+        dst: config.yaml
         strip_parent: true
     replacements:
       # darwin: Darwin

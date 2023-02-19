@@ -6,4 +6,3 @@ kube_configs:
         default_namespaces_to_show: 
           - "default"
           - "dev-xlr8s"
-        read_only: false
