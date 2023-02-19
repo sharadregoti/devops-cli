@@ -1,10 +1,11 @@
 package pluginmanager
 
 import (
+	"syscall"
+
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/internal/transformer"
 	"github.com/sharadregoti/devops/model"
-	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -93,7 +94,8 @@ func (c *CurrentPluginContext) ReadSync(e model.Event) error {
 	}
 
 	c.SendMessage(model.WebsocketResponse{
-		TableName:       utils.GetTableTitle(e.ResourceType, len(resources)),
+		EventType:       "added",
+		TableName:       e.ResourceType,
 		Data:            tableData,
 		SpecificActions: specificActions.Actions,
 	})
@@ -107,12 +109,29 @@ func (c *CurrentPluginContext) GetSpecficActionList(e model.Event) (*proto.GetAc
 func (c *CurrentPluginContext) GetLongRunning(e model.Event) map[string]*model.LongRunningInfo {
 	tempMap := map[string]*model.LongRunningInfo{}
 	for _, v := range c.longRunning {
-		if v.GetE().Type == e.Type && v.GetE().ResourceName == e.ResourceName && v.GetE().ResourceType == e.ResourceType && v.GetE().IsolatorName == e.IsolatorName {
+		if v.GetE().ResourceName == e.ResourceName && v.GetE().ResourceType == e.ResourceType && v.GetE().IsolatorName == e.IsolatorName {
 			tempMap[v.ID] = v
 		}
 	}
 
 	return tempMap
+}
+
+func (c *CurrentPluginContext) RemoveLongRunning(ID string) error {
+	lri, ok := c.longRunning[ID]
+	if !ok {
+		return logger.LogError("long running ID (%s) not found", ID)
+	}
+
+	// When process state is nil, it means process is still running
+	if lri.GetCMD().ProcessState == nil {
+		if err := syscall.Kill(-lri.GetCMD().Process.Pid, syscall.SIGKILL); err != nil {
+			return logger.LogError("Error while killing process (%s)", err.Error())
+		}
+	}
+
+	delete(c.longRunning, ID)
+	return nil
 }
 
 func (c *CurrentPluginContext) Read(e model.Event) (map[string]interface{}, error) {

@@ -126,6 +126,7 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 		tableStack:                 make([]*resourceStack, 0),
 		// TODO: This channel is not required
 		eventChan:        eventChan,
+		longRunning:      make(map[string]*model.LongRunningInfo),
 		pc:               pc,
 		actionsToExecute: map[string]*actionsToExecute{},
 	}
@@ -198,23 +199,23 @@ func (c *CurrentPluginContext) SendMessage(v model.WebsocketResponse) {
 }
 
 func (c *CurrentPluginContext) Close() error {
-	if c.eventChan != nil {
-		// TODO: Fix this
-		// select {
-		// case c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}:
-		// 	// Value was successfully sent to the channel
-		// 	close(c.eventChan)
+	// if c.eventChan != nil {
+	// TODO: Fix this
+	// select {
+	// case c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}:
+	// 	// Value was successfully sent to the channel
+	// 	close(c.eventChan)
 
-		// default:
-		// 	// Channel is closed, do not write to it
-		// }
+	// default:
+	// 	// Channel is closed, do not write to it
+	// }
 
-		// c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}
-		// close(c.eventChan)
-	}
-	if c.dataPipe != nil {
-		close(c.dataPipe)
-	}
+	// c.eventChan <- model.Event{Type: string(model.CloseEventLoop)}
+	// close(c.eventChan)
+	// }
+	// if c.dataPipe != nil {
+	// 	close(c.dataPipe)
+	// }
 	c.pc.Close()
 	logger.LogDebug("Closing the plugin")
 	return nil

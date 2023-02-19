@@ -8,13 +8,9 @@ type formPage struct {
 
 func newFormPage() *formPage {
 	genericUserInputFormBox := tview.NewForm()
-	genericUserInputFormBox.SetBorder(true).SetTitle("Form")
+	genericUserInputFormBox.SetBorder(true).SetTitle("Input Form")
 
 	return &formPage{
 		view: genericUserInputFormBox,
 	}
-}
-
-func (m *formPage) registerEventHandler() error {
-	return nil
 }

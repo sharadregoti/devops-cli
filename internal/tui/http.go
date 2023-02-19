@@ -112,7 +112,10 @@ func (a *Application) getInfo(pluginName, authId, contextId string) (*model.Info
 
 func (a *Application) sendEvent(fe model.FrontendEvent) (*model.EventResponse, error) {
 	logger.LogDebug("Sending event request... (%s)", fe.ActionName)
-	data, _ := json.Marshal(fe)
+	data, err := json.Marshal(fe)
+	if err != nil {
+		return nil, a.flashLogError("Failed to send event request, json marshal error : %v", err.Error())
+	}
 	u := url.URL{Scheme: "http", Host: a.addr, Path: fmt.Sprintf("/v1/events/%s", a.sessionID)}
 	res, err := http.Post(u.String(), "application/json", strings.NewReader(string(data)))
 	if err != nil {

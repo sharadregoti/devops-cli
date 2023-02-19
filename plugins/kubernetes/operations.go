@@ -333,9 +333,17 @@ func (d *Kubernetes) listResources(ctx context.Context, args *proto.GetResources
 
 	if args.ResourceName != "" {
 		// Single get
-		uData, err := d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorId).Get(ctx, args.ResourceName, metav1.GetOptions{})
-		if err != nil {
-			return nil, shared.LogError("failed to get dynamic resource: %v", err)
+		var uData *unstructured.Unstructured
+		if rt.isNamespaced {
+			uData, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorId).Get(ctx, args.ResourceName, metav1.GetOptions{})
+			if err != nil {
+				return nil, shared.LogError("failed to get dynamic resource: %v", err)
+			}
+		} else {
+			uData, err = d.dynamicClient.Resource(resourceId).Get(ctx, args.ResourceName, metav1.GetOptions{})
+			if err != nil {
+				return nil, shared.LogError("failed to get dynamic resource: %v", err)
+			}
 		}
 		list = &unstructured.UnstructuredList{Items: []unstructured.Unstructured{*uData}}
 	} else {

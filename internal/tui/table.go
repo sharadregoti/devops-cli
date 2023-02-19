@@ -70,22 +70,26 @@ func (m *MainView) SetHeader(d *model.TableRow) {
 	}
 }
 
-func (m *MainView) AddRow(d *model.TableRow) {
+func (m *MainView) AddRow(d []*model.TableRow) {
 	currentRowCount := m.view.GetRowCount()
-	for i, colValue := range d.Data {
-		m.SetCell(currentRowCount, i, colValue, getColor(d.Color))
+	for rowNumber, row := range d {
+		for i, colValue := range row.Data {
+			m.SetCell(currentRowCount+rowNumber, i, colValue, getColor(row.Color))
+		}
 	}
 }
 
-func (m *MainView) UpdateRow(d *model.TableRow) {
-	row := m.GetRowNum(d.Data[1])
-	if row <= 0 {
-		logger.LogDebug("Update row, row not found for id: (%s)", d.Data[1])
-		return
-	}
-	logger.LogDebug("Updating row number (%d) with id (%s)", row, d.Data[1])
-	for i, colValue := range d.Data {
-		m.SetCell(row, i, colValue, getColor(d.Color))
+func (m *MainView) UpdateRow(d []*model.TableRow) {
+	for _, rowInfo := range d {
+		row := m.GetRowNum(rowInfo.Data[1])
+		if row <= 0 {
+			logger.LogDebug("Update row, row not found for id: (%s)", rowInfo.Data[1])
+			return
+		}
+		logger.LogDebug("Updating row number (%d) with id (%s)", row, rowInfo.Data[1])
+		for i, colValue := range rowInfo.Data {
+			m.SetCell(row, i, colValue, getColor(rowInfo.Color))
+		}
 	}
 }
 

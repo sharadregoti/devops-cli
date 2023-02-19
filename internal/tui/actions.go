@@ -10,6 +10,7 @@ import (
 type Actions struct {
 	view           *tview.TextView
 	nestingEnabled bool
+	actions        []*proto.Action
 }
 
 func NewAction() *Actions {
@@ -24,6 +25,15 @@ func NewAction() *Actions {
 
 func (g *Actions) EnableNesting(v bool) {
 	g.nestingEnabled = v
+}
+
+func (g *Actions) SetDefault(arr []*proto.Action) {
+	g.actions = arr
+	g.RefreshActions(arr)
+}
+
+func (g *Actions) ResetDefault() {
+	g.RefreshActions(g.actions)
 }
 
 func (g *Actions) RefreshActions(arr []*proto.Action) {

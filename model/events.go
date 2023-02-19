@@ -51,11 +51,12 @@ const (
 	ReadResource NormalEvent = "read"
 	// DeleteResource event shows a modal promt for deleting a resource
 	// Required fields: ResourceName, ResourceType, IsolatorName
-	DeleteResource              = "delete"
-	UpdateResource              = "update"
-	CreateResource              = "create"
-	EditResource    NormalEvent = "edit"
-	ViewLongRunning NormalEvent = "view-long-running"
+	DeleteResource                = "delete"
+	UpdateResource                = "update"
+	CreateResource                = "create"
+	EditResource      NormalEvent = "edit"
+	ViewLongRunning   NormalEvent = "view-long-running"
+	DeleteLongRunning NormalEvent = "delete-long-running"
 
 	// ShowModal event shows a modal promt
 	// Required fields: ResourceName, ResourceType, IsolatorName

@@ -34,6 +34,9 @@ func getAuthenticationSetting(identifyingName, name string) string {
 
 // ChatGPT wrote this code, don't know how it works
 func getNiceFormat(data map[string]string) string {
+	if len(data) == 0 {
+		return ""
+	}
 	// data := map[string]string{
 	// 	"key1":      "value1",
 	// 	"key3":      "value3",
@@ -94,7 +97,7 @@ func getNiceFormat(data map[string]string) string {
 		result += "\n"
 	}
 
-	return result
+	return strings.Trim(result, "\n")
 }
 
 func transpose(matrix [][]string) [][]string {

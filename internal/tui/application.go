@@ -31,18 +31,25 @@ type Application struct {
 	sessionID string
 
 	// Websocket Communication Channel
-	wsdata    chan model.WebsocketResponse
-	closeChan chan struct{}
+	customTableChan chan customTable
+	wsdata          chan model.WebsocketResponse
+	closeChan       chan struct{}
 
 	// Application state
 	currentIsolator     string
 	currentResourceType string
 	currentPluginName   string
 	settings            []string
+	isCustomTableRenderingOn bool
 
 	// server
 	appConfig          *model.Config
 	currentPluginAuths *model.AuthResponse
+}
+
+type customTable struct {
+	Data      []*model.TableRow
+	TableName string
 }
 
 func NewApplication(addr string) (*Application, error) {
@@ -53,12 +60,24 @@ func NewApplication(addr string) (*Application, error) {
 	formPage := newFormPage()
 	deleteModalPage := newDeleteModalPage()
 
+	// Returns a new primitive which puts the provided primitive in the center and
+	// sets its size to the given width and height.
+	modal := func(p tview.Primitive, width, height int) tview.Primitive {
+		return tview.NewFlex().
+			AddItem(nil, 0, 1, false).
+			AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
+				AddItem(nil, 0, 1, false).
+				AddItem(p, height, 1, true).
+				AddItem(nil, 0, 1, false), width, 1, true).
+			AddItem(nil, 0, 1, false)
+	}
+
 	// Add pages to the app
 	pa := tview.NewPages()
 	pa.AddPage(cmainPage, mainPage.flexView, true, true)
 	pa.AddPage(cdeleteModalPage, deleteModalPage.view, true, true)
 	pa.AddPage(ctextOnlyPage, textOnlyPage.view, true, true)
-	pa.AddPage(cformPage, formPage.view, true, true)
+	pa.AddPage(cformPage, modal(formPage.view, 60, 15), true, true)
 	pa.SwitchToPage(cmainPage)
 
 	flash := NewFlashView()
@@ -73,6 +92,7 @@ func NewApplication(addr string) (*Application, error) {
 		flashView:       flash,
 		application:     tview.NewApplication().SetRoot(pa, true),
 		closeChan:       make(chan struct{}, 1),
+		customTableChan: make(chan customTable, 1),
 	}
 
 	return r, nil
@@ -155,18 +175,24 @@ func (a *Application) ShowForm(formData map[string]interface{}, fe model.Fronten
 	}
 
 	a.formPage.view.AddButton("OK", func() {
+		logger.LogDebug("OK button clicked")
 		a.pages.SwitchToPage(cmainPage)
+		logger.LogDebug("OK button clicked, switching to main page")
 		args := map[string]interface{}{}
 		for key := range formData {
 			fi := a.formPage.view.GetFormItemByLabel(key)
 			args[key] = fi.(*tview.InputField).GetText()
 		}
 		fe.Args = args
+		logger.LogDebug("OK button clicked, sending event: %v", fe.EventType)
 
 		_, err := a.sendEvent(fe)
 		if err != nil {
 			return
 		}
+
+		// go a.application.Draw()
+		logger.LogDebug("OK button clicked, OK OK")
 	})
 	a.formPage.view.AddButton("Cancel", func() {
 		a.pages.SwitchToPage(cmainPage)

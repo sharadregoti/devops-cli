@@ -3,15 +3,16 @@ package tui
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 
 	"github.com/rivo/tview"
+	"github.com/sharadregoti/devops/utils/logger"
 )
 
 type IsolatorView struct {
-	view          *tview.TextView
-	currentKeyMap map[string]string
-	requiredIs    []string
+	view *tview.TextView
+	// currentKeyMap map[string]string
+	currentKeyMap []string
+	// requiredIs    []string
 }
 
 func NewIsolatorView() *IsolatorView {
@@ -21,8 +22,9 @@ func NewIsolatorView() *IsolatorView {
 
 	v := &IsolatorView{
 		view:          t,
-		currentKeyMap: make(map[string]string),
-		requiredIs:    []string{},
+		currentKeyMap: []string{},
+		// currentKeyMap: make(map[string]string),
+		// requiredIs:    []string{},
 	}
 
 	// t.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -55,12 +57,14 @@ func (g *IsolatorView) SetTitle(data string) {
 func (g *IsolatorView) SetDefault(data []string) {
 	g.view.Clear()
 	// convert data to map
-	tempMap := make(map[string]string)
-	for i, v := range data {
-		tempMap[fmt.Sprintf("%d", i)] = v
-	}
-	g.currentKeyMap = tempMap
-	g.view.SetText(getNiceFormat(tempMap))
+	// tempMap := make(map[string]string)
+	// for i, v := range data {
+	// 	tempMap[fmt.Sprintf("%d", i)] = v
+	// }
+	g.currentKeyMap = data
+	// g.currentKeyMap = tempMap
+	// g.requiredIs = data
+	g.view.SetText(createKeyValuePairsIsolator(data))
 }
 
 func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
@@ -75,33 +79,43 @@ func (g *IsolatorView) AddAndRefreshView(isolatorName string) {
 		}
 	}
 
-	if len(g.currentKeyMap) == 8 {
-		// Remove the first element
-		index := len(g.requiredIs)
-		newMap := map[string]string{}
+	// if len(g.currentKeyMap) == 4 {
+	// 	// Remove the first element
+	// 	index := len(g.requiredIs)
+	// 	newMap := map[string]string{}
 
-		for k, v := range g.currentKeyMap {
-			i, _ := strconv.Atoi(k)
-			if i < index {
-				continue
-			}
-			newMap[fmt.Sprintf("%d", i+1)] = v
-		}
-		newMap[fmt.Sprintf("%d", index)] = isolatorName
-	} else {
-		g.currentKeyMap[fmt.Sprintf("%d", len(g.currentKeyMap))] = isolatorName
-	}
+	// 	for k, v := range g.currentKeyMap {
+	// 		i, _ := strconv.Atoi(k)
+	// 		if i < index {
+	// 			continue
+	// 		} else if i == index {
+	// 			newMap[fmt.Sprintf("%d", i)] = isolatorName
+	// 		} else {
+	// 			newMap[fmt.Sprintf("%d", i)] = v
+	// 		}
+	// 	}
 
-	// Insert the element at specific index, shift remaining by 1
-	// g.currentKeyMap = append(g.currentKeyMap[:1], append([]string{isolatorName}, g.currentKeyMap[1:]...)...)
-
-	// limit := 5
-	// if len(g.currentKeyMap) > limit {
-	// 	// Cut off extra keys
-	// 	g.currentKeyMap = g.currentKeyMap[:limit]
+	// 	g.currentKeyMap = newMap
+	// } else {
+	// 	g.currentKeyMap[fmt.Sprintf("%d", len(g.currentKeyMap))] = isolatorName
 	// }
 
-	g.view.SetText(getNiceFormat(g.currentKeyMap))
+	// Insert the element at specific index, shift remaining by 1
+	g.currentKeyMap = append(g.currentKeyMap[:1], append([]string{isolatorName}, g.currentKeyMap[1:]...)...)
+
+	logger.LogDebug("Current Key Map: %v", len(g.currentKeyMap))
+	limit := 8
+	if len(g.currentKeyMap) >= limit {
+		// Cut off extra keys
+		g.currentKeyMap = g.currentKeyMap[:limit-1]
+	}
+
+	tempMap := make(map[string]string)
+	for i, v := range g.currentKeyMap {
+		tempMap[fmt.Sprintf("%d", i)] = v
+	}
+
+	g.view.SetText(getNiceFormat(tempMap))
 }
 
 func createKeyValuePairsIsolator(m []string) string {

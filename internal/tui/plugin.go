@@ -24,7 +24,7 @@ func (a *Application) connectAndLoadData(pluginName string, pluginAuth *proto.Au
 	}
 
 	// Initialize all boxes
-	a.mainPage.normalActionBox.RefreshActions(infoRes.Actions)
+	a.mainPage.normalActionBox.SetDefault(infoRes.Actions)
 	a.mainPage.generalInfoBox.Refresh(infoRes.General)
 	a.mainPage.isolatorBox.SetDefault(infoRes.DefaultIsolator)
 	a.mainPage.isolatorBox.SetTitle(strings.Title(infoRes.IsolatorType))
@@ -54,7 +54,23 @@ func (a *Application) startGoRoutine() {
 			case <-a.closeChan:
 				return
 
+			case v := <-a.customTableChan:
+				a.isCustomTableRenderingOn = true
+				// a.mainPage.specificActionBox.RefreshActions(v.SpecificActions)
+				// // c.appView.ActionView.EnableNesting(rs.currentSchema.Nesting.IsNested)
+				a.mainPage.tableBox.SetTitle(v.TableName)
+				a.mainPage.tableBox.Refresh(v.Data, 0)
+				a.RemoveSearchView()
+				// a.mainPage.tableBox.Refresh(v.Data, 0)
+				a.application.SetFocus(a.mainPage.tableBox.view)
+				a.application.Draw()
+
 			case v := <-a.wsdata:
+
+				if a.isCustomTableRenderingOn {
+					// TODO: Store info of all table, so that when user comes back to normal table, we can show the same table
+					continue
+				}
 
 				if currentTableName != strings.ToLower(v.TableName) {
 					count = 0
@@ -70,10 +86,10 @@ func (a *Application) startGoRoutine() {
 
 				switch v.EventType {
 				case "added":
-					a.mainPage.tableBox.AddRow(dataRow)
+					a.mainPage.tableBox.AddRow(v.Data[1:])
 					count++
 				case "modified", "updated":
-					a.mainPage.tableBox.UpdateRow(dataRow)
+					a.mainPage.tableBox.UpdateRow(v.Data[1:])
 				case "deleted":
 					a.mainPage.tableBox.DeleteRow(dataRow)
 					count--

@@ -5,6 +5,7 @@ import (
 
 	"github.com/rivo/tview"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
+	"github.com/sharadregoti/devops/utils/logger"
 )
 
 type SpecificActions struct {
@@ -33,6 +34,8 @@ func (g *SpecificActions) RefreshActions(data []*proto.Action) {
 	}
 	// g.view.SetText(createKeyValuePairsWithBrackets(temp))
 	// TODO: This can be expensive
+	logger.LogDebug("Nice format")
+	logger.LogDebug("%s", getNiceFormat(temp))
 	g.view.SetText(getNiceFormat(temp))
 	g.actions = data
 }

@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/ghodss/yaml"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils"
 	"github.com/sharadregoti/devops/utils/logger"
-	"gopkg.in/yaml.v2"
 )
 
 func (a *Application) registerEventHandlers() {
@@ -44,9 +45,22 @@ func (a *Application) mainPageEventHandler() error {
 			a.closeChan <- struct{}{}
 			go func() {
 				a.mainPage.searchBox.view.SetText("")
+
+				_, err := a.sendEvent(model.FrontendEvent{
+					EventType:    model.InternalAction,
+					ActionName:   string(model.Close),
+					ResourceType: "",
+					ResourceName: "",
+					IsolatorName: "",
+					PluginName:   a.currentPluginName})
+				if err != nil {
+					a.flashLogError(err.Error())
+				}
+
 				if err := a.connectAndLoadData(a.currentPluginName, &proto.AuthInfo{IdentifyingName: identifyingName, Name: name}); err != nil {
 					a.flashLogError(err.Error())
 				}
+
 			}()
 			// go a.application.Draw()
 			return
@@ -70,6 +84,10 @@ func (a *Application) mainPageEventHandler() error {
 		}
 		a.currentResourceType = searchResult
 		a.mainPage.searchBox.view.SetText("")
+		// The below 2 lines, ensures that if no data is returned from the server, the table is cleared
+		a.mainPage.tableBox.view.Clear()
+		a.mainPage.tableBox.view.SetTitle(utils.GetTableTitle(a.currentResourceType, 0))
+		go a.application.Draw()
 	})
 
 	// This is here because during the search we if we press any rune key that corresponding function get triggered
@@ -205,6 +223,24 @@ func (a *Application) mainPageEventHandler() error {
 		// 	}
 		// }
 		if event.Key() == tcell.KeyEscape {
+			title := a.mainPage.tableBox.view.GetTitle()
+			if title == "Long Running Processes" {
+				a.mainPage.tableBox.view.Clear()
+				a.isCustomTableRenderingOn = false
+				a.mainPage.normalActionBox.ResetDefault()
+				_, err := a.sendEvent(model.FrontendEvent{
+					EventType:    model.InternalAction,
+					ActionName:   string(model.RefreshResource),
+					ResourceName: "",
+					ResourceType: a.currentResourceType,
+					IsolatorName: a.currentIsolator,
+					PluginName:   a.currentPluginName,
+				})
+				if err != nil {
+					return nil
+				}
+			}
+			// go a.SwitchToMain()
 			// row, _ := a.MainView.view.GetSelection()
 			// if row == 0 {
 			// 	return event
@@ -260,7 +296,7 @@ func (a *Application) mainPageEventHandler() error {
 
 			for i := range a.mainPage.isolatorBox.currentKeyMap {
 				// This check ensure title count does not get dublicated when same namespace events is triggered
-				numToRune := fmt.Sprintf("%s", i)[0]
+				numToRune := fmt.Sprintf("%d", i)[0]
 				if event.Rune() == rune(numToRune) {
 					if a.currentIsolator == a.mainPage.isolatorBox.currentKeyMap[i] {
 						return nil
@@ -281,6 +317,10 @@ func (a *Application) mainPageEventHandler() error {
 					a.currentIsolator = a.mainPage.isolatorBox.currentKeyMap[i]
 					a.closeChan <- struct{}{}
 					a.startGoRoutine()
+					// The below 2 lines, ensures that if no data is returned from the server, the table is cleared
+					a.mainPage.tableBox.view.Clear()
+					a.mainPage.tableBox.view.SetTitle(utils.GetTableTitle(a.currentResourceType, 0))
+					go a.application.Draw()
 					// a.eventChan <- model.Event{
 					// 	Type:         string(model.IsolatorChanged),
 					// 	IsolatorName: a.IsolatorView.currentKeyMap[i],
@@ -297,6 +337,7 @@ func (a *Application) mainPageEventHandler() error {
 				ResourceName: a.mainPage.tableBox.view.GetCell(row, 1).Text,
 				ResourceType: strings.ToLower(resourceType),
 				IsolatorName: a.mainPage.tableBox.view.GetCell(row, 0).Text,
+				PluginName:   a.currentPluginName,
 			})
 			if err != nil {
 				return nil
@@ -309,16 +350,52 @@ func (a *Application) mainPageEventHandler() error {
 				return event
 			}
 			resourceType, _ := utils.ParseTableTitle(a.mainPage.tableBox.view.GetTitle())
-			_, err := a.sendEvent(model.FrontendEvent{
+			res, err := a.sendEvent(model.FrontendEvent{
 				EventType:    model.NormalAction,
 				ActionName:   string(model.ViewLongRunning),
 				ResourceName: a.mainPage.tableBox.view.GetCell(row, 1).Text,
 				ResourceType: strings.ToLower(resourceType),
 				IsolatorName: a.mainPage.tableBox.view.GetCell(row, 0).Text,
+				PluginName:   a.currentPluginName,
 			})
 			if err != nil {
 				return event
 			}
+
+			data := map[string]*model.LongRunningInfo{}
+			if err := mapstructure.Decode(res.Result, &data); err != nil {
+				a.flashLogError(err.Error())
+				return event
+			}
+
+			if len(data) == 0 {
+				a.SetFlashText("No long running process found")
+				return event
+			}
+
+			table := customTable{
+				Data: []*model.TableRow{
+					{
+						Data: []string{"ID", "Name", "Status", "Message"},
+					},
+				},
+				TableName: "Long Running Processes",
+			}
+			for _, v := range data {
+				row := &model.TableRow{
+					Data: []string{v.ID, v.Name, v.Status, v.Message},
+				}
+				table.Data = append(table.Data, row)
+			}
+			a.customTableChan <- table
+			a.mainPage.normalActionBox.RefreshActions([]*proto.Action{
+				{
+					Name:       "delete",
+					KeyBinding: "ctrl-d",
+					OutputType: "nothing",
+				},
+			})
+			a.mainPage.specificActionBox.RefreshActions([]*proto.Action{})
 
 		case tcell.KeyCtrlE:
 			row, _ := a.mainPage.tableBox.view.GetSelection()
@@ -363,18 +440,29 @@ func (a *Application) mainPageEventHandler() error {
 				f.Close()
 
 				// TODO: Edit will fail
-				if err := utils.ExecuteCMD("vi " + fileName); err != nil {
+				script := "#!/bin/bash\nvi " + fileName
+				if err := utils.ExecuteCMD(script); err != nil {
 					logger.LogError("Failed to execute command: %v", err.Error())
 					return
 				}
 
 				index := 0
+				// This is the variable which contains data + error
+				newContent := ""
 				for {
 
 					ff, err := os.ReadFile(fileName)
 					if err != nil {
 						logger.LogError("Failed to open temp file: %v", err.Error())
 						return
+					}
+
+					if index > 0 {
+						// This means error has occured
+						if newContent == string(ff) {
+							// This means error has not been resolved & we need to exit
+							break
+						}
 					}
 
 					yamlContent := map[string]interface{}{}
@@ -407,7 +495,6 @@ func (a *Application) mainPageEventHandler() error {
 						return
 					}
 
-					newContent := ""
 					if index == 0 {
 						newContent = fmt.Sprintf("# %s\n%s", errs.Error(), string(ff))
 						index++
@@ -422,7 +509,8 @@ func (a *Application) mainPageEventHandler() error {
 					}
 					f.Close()
 
-					if err := utils.ExecuteCMD("vi " + fileName); err != nil {
+					script := "#!/bin/bash\nvi " + fileName
+					if err := utils.ExecuteCMD(script); err != nil {
 						logger.LogError("Failed to execute command: %v", err.Error())
 						return
 					}
@@ -468,10 +556,30 @@ func (a *Application) mainPageEventHandler() error {
 			// }
 
 		case tcell.KeyCtrlD:
+
 			row, _ := a.mainPage.tableBox.view.GetSelection()
 			if row == 0 {
 				return event
 			}
+
+			title := a.mainPage.tableBox.view.GetTitle()
+			if title == "Long Running Processes" {
+				ID := a.mainPage.tableBox.view.GetCell(row, 0).Text
+				_, err := a.sendEvent(model.FrontendEvent{
+					EventType:    model.NormalAction,
+					ActionName:   string(model.DeleteLongRunning),
+					ResourceName: ID,
+					ResourceType: "",
+					IsolatorName: "",
+					PluginName:   "",
+				})
+				if err != nil {
+					return nil
+				}
+				a.mainPage.tableBox.view.RemoveRow(row)
+				return event
+			}
+
 			resourceType, _ := utils.ParseTableTitle(a.mainPage.tableBox.view.GetTitle())
 			// a.sendEvent(model.FrontendEvent{
 			// 	EventType:  model.NormalAction,

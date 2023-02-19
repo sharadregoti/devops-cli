@@ -51,6 +51,5 @@ func (s *Server) routes() http.Handler {
 
 func (s *Server) Start() error {
 	fmt.Println("Starting server on port:", s.config.Server.Address)
-	logger.LogInfo("Hi there")
 	return http.ListenAndServe(s.config.Server.Address, utils.CreateCorsObject().Handler(middleware.LoggingHandler(logger.GetFileWriter(), s.routes())))
 }

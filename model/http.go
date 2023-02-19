@@ -1,6 +1,8 @@
 package model
 
 import (
+	"os/exec"
+
 	"github.com/gorilla/websocket"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 )
@@ -80,6 +82,7 @@ type LongRunningInfo struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 	e       *Event
+	cmd     *exec.Cmd
 }
 
 func (lri *LongRunningInfo) SetE(e *Event) {
@@ -88,6 +91,14 @@ func (lri *LongRunningInfo) SetE(e *Event) {
 
 func (lri *LongRunningInfo) GetE() *Event {
 	return lri.e
+}
+
+func (lri *LongRunningInfo) SetCMD(e *exec.Cmd) {
+	lri.cmd = e
+}
+
+func (lri *LongRunningInfo) GetCMD() *exec.Cmd {
+	return lri.cmd
 }
 
 type AuthResponse struct {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -326,17 +327,41 @@ func (c *CurrentPluginContext) NewLongRunning(cmdStr string, e *model.Event) err
 	}
 	lri.SetE(e)
 
-	// Set the command to execute
-	arr := strings.Split(cmdStr, " ")
+	// create a temporary file
+	f, err := ioutil.TempFile("", "script")
+	if err != nil {
+		// handle error
+		return logger.LogError("failed to create temp file: Error ", err)
+	}
+
+	// write the script to the file
+	_, err = f.WriteString(cmdStr)
+	if err != nil {
+		// handle error
+		f.Close()
+		return logger.LogError("failed to write data in temp file: Error ", err)
+	}
+	f.Close()
+
+	// make the file executable
+	err = os.Chmod(f.Name(), 0777)
+	if err != nil {
+		// handle error
+		return logger.LogError("failed to make the temp file executable: Error ", err)
+	}
 
 	// Execute the command
-	cmd := exec.Command(arr[0], arr[1:]...)
-	err := cmd.Run()
-	if err != nil {
+	cmd := exec.Command(f.Name())
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	lri.SetCMD(cmd)
+	if err := cmd.Start(); err != nil {
 		return logger.LogError("Error while running command: %s", err)
 	}
 
 	go func() {
+		defer logger.LogDebug("Exiting long running command routine with id (%s)", id)
+		defer os.Remove(f.Name()) // delete the file when we're done
+
 		err := cmd.Wait()
 		if err != nil {
 			lri.Status = "failed"
@@ -346,27 +371,28 @@ func (c *CurrentPluginContext) NewLongRunning(cmdStr string, e *model.Event) err
 	}()
 
 	c.longRunning[id] = lri
+	logger.LogDebug("Added long running command with id (%s), process id (%s)", id, cmd.Process.Pid)
 	return nil
 }
 
-func ExecuteCMDLong(cmdStr string) error {
-	// Set the command to execute
-	arr := strings.Split(cmdStr, " ")
+// func ExecuteCMDLong(cmdStr string) error {
+// 	// Set the command to execute
+// 	arr := strings.Split(cmdStr, " ")
 
-	// Execute the command
-	c := exec.Command(arr[0], arr[1:]...)
-	err := c.Run()
-	if err != nil {
-		return logger.LogError("Error while running command: %s", err)
-	}
+// 	// Execute the command
+// 	c := exec.Command(arr[0], arr[1:]...)
+// 	err := c.Run()
+// 	if err != nil {
+// 		return logger.LogError("Error while running command: %s", err)
+// 	}
 
-	go func() {
-		err := c.Wait()
-		if err != nil {
-			logger.LogError("Error while waiting for command to finish: %s", err)
-		}
+// 	go func() {
+// 		err := c.Wait()
+// 		if err != nil {
+// 			logger.LogError("Error while waiting for command to finish: %s", err)
+// 		}
 
-	}()
+// 	}()
 
-	return nil
-}
+// 	return nil
+// }

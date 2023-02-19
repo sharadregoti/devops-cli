@@ -125,6 +125,8 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 		}
 		defer utils.CloseTheCloser(r.Body)
 
+		logger.LogDebug("Request came")
+
 		params := mux.Vars(r)
 		ID := params["id"]
 		pCtx, err := sm.GetClient(ID)
@@ -132,6 +134,8 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
 			return
 		}
+
+		logger.LogDebug("Got client ID")
 
 		if strings.ToLower(req.IsolatorName) == "na" {
 			req.IsolatorName = ""
@@ -187,7 +191,7 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 				return
 
 			case model.DeleteResource:
-				if pCtx.Delete(e); err != nil {
+				if err := pCtx.Delete(e); err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
@@ -197,7 +201,7 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 
 			case model.IsolatorChanged:
 
-				if pCtx.ResourceChanged(e); err != nil {
+				if err := pCtx.ResourceChanged(e); err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
@@ -209,6 +213,15 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 				result := pCtx.GetLongRunning(e)
 
 				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: result})
+				return
+
+			case model.DeleteLongRunning:
+				if err := pCtx.RemoveLongRunning(e.ResourceName); err != nil {
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
+					return
+				}
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return
 
 			default:
@@ -233,6 +246,12 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
+				return
+
+			case model.Close:
+				sm.DeleteClient(ID)
 
 				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
 				return

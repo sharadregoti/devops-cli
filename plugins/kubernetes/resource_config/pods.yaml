@@ -83,22 +83,112 @@ specific_actions:
       cmd: |
         #!/bin/bash
         kubectl --kubeconfig {{.authPath}} --context {{.authName}} exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh -c "command -v bash >/dev/null && exec bash || exec sh"
-        # kubectl exec -it {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -- sh
     output_type: "bidirectional"
+  - name: "open-app"
+    key_binding: "o"
+    output_type: "nothing"
+    execution:
+      cmd: |
+        #!/bin/bash
+
+
+        if [[ "$(uname)" == "Linux" ]]; then
+            xdg-open "http://localhost:{{.args.localPort}}/"
+        elif [[ "$(uname)" == "Darwin" ]]; then
+            open "http://localhost:{{.args.localPort}}/"
+        else
+            echo "Unsupported operating system: $(uname)"
+            exit 1
+        fi
+
+        # Run this in background
+        kubectl --kubeconfig {{.authPath}} --context {{.authName}} port-forward {{.resourceName}} -n {{.isolatorName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}
+      is_long_running: true
+      user_input:
+        required: true
+        args:
+          # The below template returns the first container port of the first container of the pod
+          containerPort: |
+            {{- if .resource.spec.containers -}}
+              {{- if (index .resource.spec.containers 0).ports -}}
+                {{- if (index (index .resource.spec.containers 0).ports 0) -}}
+                  {{- (index (index .resource.spec.containers 0).ports 0).containerPort -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+          localPort: |
+            {{- if .resource.spec.containers -}}
+              {{- if (index .resource.spec.containers 0).ports -}}
+                {{- if (index (index .resource.spec.containers 0).ports 0) -}}
+                  {{- (index (index .resource.spec.containers 0).ports 0).containerPort -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+          address: "localhost"
+      server_input: 
+        required: false
   - name: "port-forward"
     key_binding: "f"
     output_type: "nothing"
     execution:
       cmd: |
         #!/bin/bash
-        kubectl port-forward {{.resourceName}} -n {{.isolatorName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}
+        kubectl --kubeconfig {{.authPath}} --context {{.authName}} port-forward {{.resourceName}} -n {{.isolatorName}} {{.args.localPort}}:{{.args.containerPort}} --address {{.args.address}}
       is_long_running: true
       user_input:
         required: true
         args:
-          containerPort: "{{(index (index .resource.spec.containers 0).ports 0).containerPort}}"
-          localPort: "{{(index (index .resource.spec.containers 0).ports 0).containerPort}}"
+          # The below template returns the first container port of the first container of the pod
+          containerPort: |
+            {{- if .resource.spec.containers -}}
+              {{- if (index .resource.spec.containers 0).ports -}}
+                {{- if (index (index .resource.spec.containers 0).ports 0) -}}
+                  {{- (index (index .resource.spec.containers 0).ports 0).containerPort -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
+          localPort: |
+            {{- if .resource.spec.containers -}}
+              {{- if (index .resource.spec.containers 0).ports -}}
+                {{- if (index (index .resource.spec.containers 0).ports 0) -}}
+                  {{- (index (index .resource.spec.containers 0).ports 0).containerPort -}}
+                {{- end -}}
+              {{- end -}}
+            {{- end -}}
           address: "localhost"
       server_input: 
         required: false
+  - name: "what-is-this"
+    key_binding: "w"
+    output_type: "stream"
+    execution:
+      cmd: |
+        #!/bin/bash
 
+        my_var="
+        # What does the below Kubernetes resource YAML do?  Answer the question with below format.
+
+        What is this resource?
+        Why it is required?
+        How it does the intended work?
+
+        {{toYaml .resource | nindent 4}}
+        "
+
+        # go-open-ai is a CLI tool that uses OpenAI's GPT-3 API to generate answers to questions.
+        # Available at https://github.com/sharadregoti/go-open-ai
+        echo $my_var | go-open-ai
+
+        function clean_up {
+            # Perform program exit housekeeping
+            echo "Cleaning up..."
+            exit 0
+        }
+
+        trap clean_up SIGINT SIGTERM
+
+        while true; do
+            sleep 1
+        done
+
+      is_long_running: false

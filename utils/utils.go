@@ -22,6 +22,12 @@ func GetTableTitle(title string, total int) string {
 
 func ParseTableTitle(title string) (string, string) {
 	arr := strings.Split(title, " ")
+	if len(arr) == 0 {
+		return "", ""
+	}
+	if len(arr) == 1 {
+		return arr[0], ""
+	}
 	return strings.ToLower(arr[0]), strings.TrimPrefix(strings.TrimSuffix(arr[1], ")"), "(")
 }
 
@@ -153,5 +159,6 @@ func ExecuteCMD(cmdStr string) error {
 	// TODO: Errors made by commands are not being handled
 	_, _ = io.Copy(os.Stdout, ptmx)
 	logger.LogDebug("Closing stdout:")
+	logger.LogDebug("Exit code is: %d", c.ProcessState.ExitCode())
 	return nil
 }
