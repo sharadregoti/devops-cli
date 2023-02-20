@@ -95,19 +95,31 @@ func NewCommand() *cobra.Command {
 			// Read the configuration file
 			viper.SetConfigType("yaml")
 			configFilePath := viper.GetString("config")
+			var conf model.Config
 			if configFilePath != "" {
 				viper.SetConfigFile(configFilePath)
+				if err := viper.ReadInConfig(); err != nil {
+					return fmt.Errorf("error reading config file, %v", err)
+				}
+
+				if err := viper.Unmarshal(&conf); err != nil {
+					return fmt.Errorf("unable to decode into struct, %v", err)
+				}
 			} else {
-				viper.AddConfigPath(".")
-			}
+				// Generate default config
+				fmt.Println("Auto generating default configuration")
 
-			if err := viper.ReadInConfig(); err != nil {
-				return fmt.Errorf("error reading config file, %v", err)
-			}
+				plugins, err := pm.ListPlugins()
+				if err != nil {
+					return err
+				}
 
-			var conf model.Config
-			if err := viper.Unmarshal(&conf); err != nil {
-				return fmt.Errorf("unable to decode into struct, %v", err)
+				conf = model.Config{
+					Server: &model.Server{
+						Address: "localhost:9753",
+					},
+					Plugins: plugins,
+				}
 			}
 
 			if len(conf.Plugins) == 0 {
@@ -137,6 +149,7 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(NewVersionCommand())
 	cmd.AddCommand(NewTUICommand())
 
+	cmd.Flags().StringP("config", "", "", "Server listen address")
 	cmd.Flags().StringP("server.address", "", "localhost:9753", "Server listen address")
 	return cmd
 }

@@ -3,8 +3,6 @@ package pluginmanager
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
@@ -39,14 +37,12 @@ func InitAndGetAuthInfo(pluginName string) (*proto.AuthInfoResponse, error) {
 
 	pc, err := startPlugin(logger.Loggerf, pluginName, devopsDir)
 	if err != nil {
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
+		return nil, err
 	}
 
 	kp, err := pc.GetPlugin(pluginName)
 	if err != nil {
-		time.Sleep(5 * time.Second)
-		os.Exit(1)
+		return nil, err
 	}
 
 	auths, err := kp.GetAuthInfo()
