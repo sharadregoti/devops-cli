@@ -1,11 +1,10 @@
 # Devops CLI: A tool to do DevOps in style
 
-A Terminal UI to interact with devops tools & services, intended for devops/platform engineers.
+A Terminal/Web UI to interact with devops tools & services, intended for devops/platform engineers.
 
 ## This project aims to achieve the following:
 - Improve debugging
-- Imporve development agility
-
+- Improve development agility
 
 ## Demo
 
@@ -16,16 +15,14 @@ https://user-images.githubusercontent.com/24411676/210130161-4c467179-9bff-45fd-
 ## Installation
 **Linux & Mac**
 
-`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/install.sh | bash`
+`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.3.0/install.sh | bash`
 
 ## Supported Plugins
 - Kubernetes
-- AWS (WIP)
-- Jenkins (WIP)
+- Helm (WIP)
 
 ### Kubernetes Features
 - View & search all cluster resources
-- View nested resources. example viewing pods of deployments, services etc...
-- View YAML of specfic resource
+- Create, Read, Update, Delete any resource
 - Describe any resource
-- View logs of pod
+- View logs, get shell access of pod
