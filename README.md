@@ -17,6 +17,8 @@ https://user-images.githubusercontent.com/24411676/210130161-4c467179-9bff-45fd-
 
 `curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.3.0/install.sh | bash`
 
+## Read Wiki for detailed documentation 
+
 ## Supported Plugins
 - Kubernetes
 - Helm (WIP)
