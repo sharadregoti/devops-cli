@@ -28,7 +28,7 @@ https://user-images.githubusercontent.com/24411676/210130161-4c467179-9bff-45fd-
 
 `devops`
 
-**Run Client (TUI)
+**Run Client (TUI)**
 
 `devops tui`
 
