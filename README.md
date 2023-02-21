@@ -34,6 +34,7 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 ## Supported Plugins
 - Kubernetes
 - Helm (WIP)
+- Gitlab (WIP)
 
 ### Kubernetes Features
 - View & search all cluster resources
