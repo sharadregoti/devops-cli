@@ -22,6 +22,16 @@ https://user-images.githubusercontent.com/24411676/210130161-4c467179-9bff-45fd-
 
 `curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.3.0/install.sh | bash`
 
+## Usage
+
+**Run Server**
+
+`devops`
+
+**Run Client (TUI)
+
+`devops tui`
+
 ## Read [Wiki](https://github.com/sharadregoti/devops-cli/wiki) for detailed documentation 
 
 ## Supported Plugins
