@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+option go_package = "./proto";
+
+// protoc -I ./proto    --go_out ./proto --go_opt paths=source_relative    --go-grpc_out ./proto --go-grpc_opt paths=source_relative ./proto/devops.proto
+// ############################# MainBox #############################
+
+message GetResourcesArgs {
+  string resource_name = 1;
+  string resource_type = 2;
+  string isolator_id = 3;
+  map<string, google.protobuf.Value> args = 4;
+}
+
+message WatchResourceResult {
+	string Type = 1;
+	google.protobuf.Value Result = 2;
+}
+
+message ResourceTransformer {
+  repeated Operations operations = 1;
+  repeated Action specific_actions = 2;
+  repeated Styles styles = 3;
+  Nesting nesting = 4;
+}
+
+message Operations {
+  string name = 1;
+  repeated JSONPaths json_paths = 2;
+  string output_format = 3;
+}
+
+message JSONPaths {
+  string path = 1;
+}
+
+message Styles {
+  string row_background_color = 1;
+  repeated string conditions = 2;
+}
+
+message Nesting {
+  bool is_nested = 1;
+  string resource_type = 2;
+  map<string, string> args = 3;
+  bool is_self_contained_in_parent = 4;
+  repeated string parent_data_paths = 5;
+}
+
+// ############################# SearchBox #############################
+
+message GetResourceTypeListResponse {
+  repeated string resource_type = 1;
+}
+
+message AuthInfo {
+  string identifying_name = 1;
+  string name = 2;
+  bool is_default = 3;
+  repeated string default_isolators = 4;
+  map<string, string> info = 5;
+  string path = 6;
+}
+
+message AuthInfoResponse {
+    repeated AuthInfo authInfo = 1;
+}
+
+message ActionDeleteResourceArgs {
+  string resource_name = 1;
+  string resource_type = 2;
+  string isolator_name = 3;
+}
+
+message ActionCreateResourceArgs {
+  string resource_name = 1;
+  string resource_type = 2;
+  string isolator_name = 3;
+  google.protobuf.Value data = 4;
+}
+
+message ActionUpdateResourceArgs {
+  string resource_name = 1;
+  string resource_type = 2;
+  string isolator_name = 3;
+  google.protobuf.Value data = 4;
+}
+
+message SpecificActionArgs {
+  string action_name = 1;
+  string resource_name = 2;
+  string resource_type = 3;
+  string isolator_name = 4;
+  map<string, google.protobuf.Value> args = 5;
+}
+
+message SpecificActionResult {
+  google.protobuf.Value result = 1;
+  string output_type = 2;
+}
+
+
+message Action {
+  string name = 1;
+  string key_binding = 2;
+  string output_type = 3;
+  map<string, google.protobuf.Value> args = 4;
+  map<string, google.protobuf.Value> schema = 5;
+  Execution execution = 6;
+}
+
+message Execution {
+  string cmd = 1;
+  bool is_long_running = 2;
+  UserInput user_input = 3;
+  ServerInput server_input = 4;
+}
+
+message UserInput {
+  bool required = 1;
+  map<string, google.protobuf.Value> args = 2;
+}
+
+message ServerInput {
+  bool required = 1;
+}
+
+message GetActionListResponse {
+    repeated Action actions = 1;
+}
+
+service Devops {
+  rpc Name (google.protobuf.Empty) returns (google.protobuf.StringValue);
+
+  rpc GetResources (GetResourcesArgs) returns (google.protobuf.ListValue);
+  rpc WatchResources (GetResourcesArgs) returns (stream WatchResourceResult);
+  rpc CloseResourceWatcher (google.protobuf.StringValue) returns (google.protobuf.Empty);
+  rpc GetResourceTypeSchema (google.protobuf.StringValue) returns (ResourceTransformer);
+
+  rpc GetResourceTypeList (google.protobuf.Empty) returns (GetResourceTypeListResponse);
+
+  rpc GetAuthInfo (google.protobuf.Empty) returns (AuthInfoResponse);
+  rpc Connect (AuthInfo) returns (google.protobuf.Empty);
+
+  rpc GetResourceIsolatorType (google.protobuf.Empty) returns (google.protobuf.StringValue);
+  rpc GetDefaultResourceIsolator (google.protobuf.Empty) returns (google.protobuf.StringValue);
+  
+  rpc GetSupportedActions (google.protobuf.Empty) returns (GetActionListResponse);
+  rpc ActionDeleteResource (ActionDeleteResourceArgs) returns (google.protobuf.Empty);
+  rpc ActionCreateResource (ActionCreateResourceArgs) returns (google.protobuf.Empty);
+  rpc ActionUpdateResource (ActionUpdateResourceArgs) returns (google.protobuf.Empty);
+  
+  rpc GetSpecficActionList (google.protobuf.StringValue) returns (GetActionListResponse);
+  rpc PerformSpecificAction (SpecificActionArgs) returns (SpecificActionResult);
+}

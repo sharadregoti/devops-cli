@@ -1,0 +1,36 @@
+# Remove repo
+# Update repo
+operations:
+  - name: "namespace"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "name"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "revision"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "updated"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "status"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "chart"
+    json_paths: 
+    - path: ""
+    output_format: ""
+  - name: "app_version"
+    json_paths: 
+    - path: ""
+    output_format: ""
+styles:
+  - row_background_color: lightskyblue
+    conditions:
+    - 'true'
+specific_actions:
