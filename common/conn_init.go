@@ -10,6 +10,9 @@ import (
 	"log"
 )
 
+var logger *log.Logger
+var Release = false
+
 var data = `
 {
 	"client_id": "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com",

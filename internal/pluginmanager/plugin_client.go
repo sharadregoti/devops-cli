@@ -9,7 +9,6 @@ import (
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	shared "github.com/sharadregoti/devops-plugin-sdk"
-	"github.com/sharadregoti/devops/common"
 	"github.com/sharadregoti/devops/model"
 )
 
@@ -77,14 +76,12 @@ func startPlugin(logger hclog.Logger, pluginName, rootDir string) (*PluginClient
 
 	if client.Exited() {
 		str := fmt.Sprintf("%s plugin exited", pluginName)
-		common.Error(logger, str)
 		return nil, fmt.Errorf(str)
 	}
 
 	// Connect via GRPC
 	rpcClient, err := client.Client()
 	if err != nil {
-		common.Error(logger, fmt.Sprintf("Failed to initialzed plugin client: %v", err))
 		return nil, err
 	}
 
@@ -119,7 +116,6 @@ func (p *PluginClient) GetPlugin(name string) (shared.Devops, error) {
 	// Request the plugin
 	raw, err := p.client.Dispense(name)
 	if err != nil {
-		common.Error(p.logger, fmt.Sprintf("failed to get plugin: %v, %v", name, err))
 		return nil, err
 	}
 
