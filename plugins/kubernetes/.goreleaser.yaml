@@ -1,0 +1,51 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: devops-kubernetes-plugin
+    flags:
+    - -tags=release
+    # - -o kubernetes
+    main: .
+    binary: kubernetes
+    goos:
+      - linux
+      # - windows
+      - darwin
+release:
+  disable: true
+  skip_upload: true
+
+archives:
+  - builds:
+    - devops-kubernetes-plugin
+    id: devops-kubernetes-plugin
+    name_template: "devops-kubernetes-plugin_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - config.yaml
+      - src: resource_config
+        dst: resource_config
+        strip_parent: true
+    replacements:
+      # darwin: Darwin
+      # linux: Linux
+      # windows: Windows
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+blobs:
+  - provider: gs
+    bucket: devops-cli-artifacts
+    folder: "releases/devops/{{.Version}}"
+    ids:
+    - devops-kubernetes-plugin
