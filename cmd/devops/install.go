@@ -265,12 +265,12 @@ func runUpgrade() error {
 		return err
 	}
 
-	err = cmd.Wait()
-	if err != nil {
-		// handle error
-		fmt.Println("failed to wait for cmd: Error ", err)
-		return err
-	}
+	// err = cmd.Wait()
+	// if err != nil {
+	// 	// handle error
+	// 	fmt.Println("failed to wait for cmd: Error ", err)
+	// 	return err
+	// }
 
 	return nil
 }

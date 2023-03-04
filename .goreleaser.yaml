@@ -1,3 +1,15 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: devops-core
+    flags:
+    - -tags=release
+    main: ./cmd/devops
+    goos:
+      - linux
+      # - windows
+      - darwin
 release:
   disable: true
   skip_upload: true

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/hashicorp/go-hclog"
+	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -93,14 +93,14 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	// Check if the kubectl command exists
 	_, err := exec.LookPath("kubectl")
 	if err != nil {
-		return &Kubernetes{logger: logger, isOK: fmt.Errorf("kubectl command not found: %w", err)}, err
+		return &Kubernetes{logger: logger, isOK: shared.LogError("kubectl command not found: %v", err)}, err
 	}
 
 	// Read resource configs
 	resourceSchemaTypeMap := map[string]*proto.ResourceTransformer{}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to read directory: %v", err)
 	}
 	// Create the ".devops" subdirectory if it doesn't exist
 	// TODO: This should be a function in the core binary
@@ -110,7 +110,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	// Read all resource type scheam
 	files, err := ioutil.ReadDir(schemaPath)
 	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read directory: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to read directory: %v", err)
 	}
 
 	for _, f := range files {
@@ -120,29 +120,34 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 
 		data, err := os.ReadFile(schemaPath + "/" + f.Name())
 		if err != nil {
-			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read table schema file %s: %w", f.Name(), err)
+			return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to read table schema file %s: %v", f.Name(), err)
 		}
 
 		res := new(proto.ResourceTransformer)
 		if err := yaml.Unmarshal(data, res); err != nil {
-			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal table schema data: %w", err)
+			return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to unmarshal table schema data: %v", err)
 		}
 		resourceSchemaTypeMap[strings.TrimSuffix(f.Name(), ".yaml")] = res
 	}
 
 	data, err := os.ReadFile(getConfigPath(devopsDir) + "/" + "config.yaml")
 	if err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to read config.yaml file %s: %w", "config.yaml", err)
+		return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to read config.yaml file %s: %v", "config.yaml", err)
 	}
 
 	res := new(Config)
 	if err := yaml.Unmarshal(data, res); err != nil {
-		return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to unmarshal config.yaml data: %w", err)
+		return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to unmarshal config.yaml data: %v", err)
 	}
+
+	defaultKubeConfigLocation := filepath.Join(homeDir, ".kube", "config")
 
 	defaultFound := false
 	for _, kubeConfig := range res.KubeConfigs {
-		if kubeConfig.Name == "default" {
+		if kubeConfig.Path == defaultKubeConfigLocation {
+			if kubeConfig.Name == "" {
+				kubeConfig.Name = "default"
+			}
 			defaultFound = true
 		}
 	}
@@ -151,7 +156,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 		// Add default config
 		res.KubeConfigs = append(res.KubeConfigs, &KubeConfigs{
 			Name: "default",
-			Path: filepath.Join(homeDir, ".kube", "config")},
+			Path: defaultKubeConfigLocation},
 		)
 	}
 
@@ -159,7 +164,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 	for i, kc := range res.KubeConfigs {
 		kubeconfig, err := clientcmd.LoadFromFile(kc.Path)
 		if err != nil {
-			return &Kubernetes{logger: logger, isOK: err}, fmt.Errorf("failed to build config from flags: %w", err)
+			return &Kubernetes{logger: logger, isOK: err}, shared.LogError("failed to build config from flags: %v", err)
 		}
 
 		for k, ctx := range kubeconfig.Contexts {

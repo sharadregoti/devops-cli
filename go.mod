@@ -15,6 +15,7 @@ require (
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/hashicorp/go-plugin v1.4.8
 	github.com/kr/pty v1.1.1
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/rivo/tview v0.0.0-20221128165837-db36428c92d9
 	github.com/sharadregoti/devops-plugin-sdk v0.0.0-00010101000000-000000000000
 	github.com/swaggo/swag v1.8.9
@@ -46,7 +47,6 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.6.0 // indirect
 	github.com/onsi/gomega v1.24.1 // indirect

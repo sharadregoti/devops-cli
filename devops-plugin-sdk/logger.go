@@ -57,5 +57,5 @@ func GetHCLLogLevel() hclog.Level {
 		return hclog.Error
 	}
 
-	return hclog.Info
+	return hclog.Debug
 }

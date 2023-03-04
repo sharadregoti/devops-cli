@@ -108,6 +108,9 @@ func (d *Kubernetes) Connect(authInfo *proto.AuthInfo) error {
 }
 
 func (d *Kubernetes) GetResources(args *proto.GetResourcesArgs) ([]interface{}, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 
 	label := ""
 	for k, v := range args.Args {
@@ -132,6 +135,9 @@ func (d *Kubernetes) GetResources(args *proto.GetResourcesArgs) ([]interface{}, 
 
 // TODO: test & fix this
 func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
+	if d.isOK != nil {
+		return d.isOK
+	}
 	// res, ok := d.resourceWatcherChanMap[resourceType]
 	// if !ok {
 	// 	return shared.LogError("channel for resource type %s does not exists", resourceType)
@@ -145,6 +151,10 @@ func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 
 // TODO: test & fix this
 func (d *Kubernetes) WatchResources(args *proto.GetResourcesArgs) (chan shared.WatchResourceResult, chan struct{}, error) {
+	if d.isOK != nil {
+		return nil, nil, d.isOK
+	}
+
 	if len(d.resourceWatcherChanMap) > 0 {
 		for k, v := range d.resourceWatcherChanMap {
 			d.logger.Trace(fmt.Sprintf("Invoking close resource watcher event for resource type %s", k))
@@ -241,6 +251,9 @@ func convertToMap(obj runtime.Object) (map[string]interface{}, error) {
 }
 
 func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (*proto.ResourceTransformer, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
 		d.logger.Trace(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
@@ -251,6 +264,9 @@ func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (*proto.Resource
 }
 
 func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 	resp := []string{}
 	for r := range d.resourceTypes {
 		resp = append(resp, r)
@@ -262,6 +278,9 @@ func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
 
 // TODO: test & fix this
 func (d *Kubernetes) GetAuthInfo() (*proto.AuthInfoResponse, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 	authInfo := new(proto.AuthInfoResponse)
 
 	for _, kc := range d.kubeCLIconfig.KubeConfigs {
@@ -324,6 +343,9 @@ func (d *Kubernetes) GetSupportedActions() (*proto.GetActionListResponse, error)
 }
 
 func (d *Kubernetes) ActionDeleteResource(args *proto.ActionDeleteResourceArgs) error {
+	if d.isOK != nil {
+		return d.isOK
+	}
 	return d.deleteResource(context.Background(), args)
 }
 
