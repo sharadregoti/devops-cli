@@ -36,10 +36,10 @@ type Application struct {
 	closeChan       chan struct{}
 
 	// Application state
-	currentIsolator     string
-	currentResourceType string
-	currentPluginName   string
-	settings            []string
+	currentIsolator          string
+	currentResourceType      string
+	currentPluginName        string
+	settings                 []string
 	isCustomTableRenderingOn bool
 
 	// server
@@ -153,7 +153,7 @@ func (a *Application) loadPlugin(pluginName string) error {
 	}
 
 	// Load default plugin auth
-	if err := a.connectAndLoadData(a.appConfig.Plugins[0].Name, pluginAuth); err != nil {
+	if err := a.connectAndLoadData(pluginName, pluginAuth); err != nil {
 		logger.LogError("Failed to load default plugin auth: %v", err)
 		// Show auth selection
 		a.mainPage.tableBox.Refresh(contexts, 0)

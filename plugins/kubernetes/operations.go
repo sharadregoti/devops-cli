@@ -39,6 +39,10 @@ func (d *Kubernetes) watchResourceDynamic(ctx context.Context, args *proto.GetRe
 	var list watch.Interface
 	var err error
 
+	if args.IsolatorId == "all" {
+		args.IsolatorId = v1.NamespaceAll
+	}
+
 	if rt.isNamespaced {
 		list, err = d.dynamicClient.Resource(resourceId).Namespace(args.IsolatorId).Watch(ctx, metav1.ListOptions{})
 	} else {
@@ -330,6 +334,10 @@ func (d *Kubernetes) listResources(ctx context.Context, args *proto.GetResources
 
 	var list *unstructured.UnstructuredList
 	var err error
+
+	if args.IsolatorId == "all" {
+		args.IsolatorId = v1.NamespaceAll
+	}
 
 	if args.ResourceName != "" {
 		// Single get

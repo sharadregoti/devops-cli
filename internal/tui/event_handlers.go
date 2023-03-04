@@ -33,9 +33,15 @@ func (a *Application) mainPageEventHandler() error {
 				return
 			}
 
-			if err := a.loadPlugin(pluginName); err != nil {
-				a.flashLogError(err.Error())
-			}
+			a.closeChan <- struct{}{}
+			go func() {
+				a.mainPage.searchBox.view.SetText("")
+
+				if err := a.loadPlugin(pluginName); err != nil {
+					a.flashLogError(err.Error())
+				}
+			}()
+
 			return
 		}
 
@@ -150,7 +156,7 @@ func (a *Application) mainPageEventHandler() error {
 						ActionName:   action.Name,
 						ResourceType: strings.ToLower(resourceType),
 						ResourceName: a.mainPage.tableBox.view.GetCell(row, 1).Text,
-						IsolatorName: a.currentIsolator,
+						IsolatorName: a.mainPage.tableBox.view.GetCell(row, 0).Text,
 						PluginName:   a.currentPluginName,
 					}
 					if action.Execution != nil && action.Execution.UserInput != nil && action.Execution.UserInput.Required {
@@ -222,6 +228,7 @@ func (a *Application) mainPageEventHandler() error {
 		// 		}
 		// 	}
 		// }
+
 		if event.Key() == tcell.KeyEscape {
 			title := a.mainPage.tableBox.view.GetTitle()
 			if title == "Long Running Processes" {

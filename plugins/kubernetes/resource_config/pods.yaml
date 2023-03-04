@@ -76,6 +76,9 @@ specific_actions:
       cmd: |
         #!/bin/bash
         kubectl logs {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -f --kubeconfig {{.authPath}} --context {{.authName}}
+        while :; do
+          :
+        done        
     output_type: "stream"
   - name: "shell"
     key_binding: "s"

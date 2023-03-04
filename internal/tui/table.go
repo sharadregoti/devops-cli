@@ -83,10 +83,12 @@ func (m *MainView) UpdateRow(d []*model.TableRow) {
 	for _, rowInfo := range d {
 		row := m.GetRowNum(rowInfo.Data[1])
 		if row <= 0 {
-			logger.LogDebug("Update row, row not found for id: (%s)", rowInfo.Data[1])
+			// logger.LogDebug("Update row, row not found for id: (%s)", rowInfo.Data[1])
+			// logger.LogDebug("Hi, here %v", rowInfo.Data)
+			m.AddRow(d)
 			return
 		}
-		logger.LogDebug("Updating row number (%d) with id (%s)", row, rowInfo.Data[1])
+		// logger.LogDebug("Updating row number (%d) with id (%s)", row, rowInfo.Data[1])
 		for i, colValue := range rowInfo.Data {
 			m.SetCell(row, i, colValue, getColor(rowInfo.Color))
 		}

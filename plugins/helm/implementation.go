@@ -1,22 +1,64 @@
-package helm
+package main
 
 import (
+	"fmt"
+	"strings"
+
+	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func (h *Helm) Name() string {
-	return "helm"
+	return PluginName
 }
 
 // TODO: test & fix this
 func (h *Helm) Connect(authInfo *proto.AuthInfo) error {
+	if h.isOK != nil {
+		return h.isOK
+	}
+
+	kubeConfigPath := ""
+	for _, kc := range h.kubeCLIconfig.KubeConfigs {
+		for _, c := range kc.Contexts {
+			if authInfo.IdentifyingName == kc.Name && authInfo.Name == c.Name {
+				kubeConfigPath = kc.Path
+				break
+			}
+		}
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	if err != nil {
+		return shared.LogError("failed to build config from flags: %v", err)
+	}
+
+	// Normal client
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return shared.LogError("failed to create normal kube client: %v", err)
+	}
+
+	shared.LogDebug("Connecting to kubernetes cluster at path %s with context %s", kubeConfigPath, authInfo.Name)
+	h.normalClient = clientset
+	h.restConfig = restConfig
 
 	return nil
 }
 
 func (h *Helm) GetResources(args *proto.GetResourcesArgs) ([]interface{}, error) {
-
-	return items, nil
+	switch args.ResourceType {
+	// case "repos":
+	// 	return listRepos()
+	// case "charts":
+	// return listCharts()
+	case "releases":
+		return h.listReleases(args)
+	default:
+		return nil, shared.LogError("resource type %s not supported", args.ResourceType)
+	}
 }
 
 // TODO: test & fix this
@@ -33,21 +75,87 @@ func (h *Helm) CloseResourceWatcher(resourceType string) error {
 }
 
 // TODO: test & fix this
-func (h *Helm) WatchResources(resourceType string) (chan shared.WatchResourceResult, chan struct{}, error) {
+func (h *Helm) WatchResources(args *proto.GetResourcesArgs) (chan shared.WatchResourceResult, chan struct{}, error) {
+	if h.isOK != nil {
+		return nil, nil, h.isOK
+	}
+
+	if len(h.resourceWatcherChanMap) > 0 {
+		for k, v := range h.resourceWatcherChanMap {
+			h.logger.Trace(fmt.Sprintf("Invoking close resource watcher event for resource type %s", k))
+			v.serverDone <- struct{}{}
+			v.watcherDone <- struct{}{}
+		}
+		h.resourceWatcherChanMap = make(map[string]channels)
+	}
+
+	_, ok := h.resourceWatcherChanMap[args.ResourceType]
+	if ok {
+		h.logger.Debug(fmt.Sprintf("Channel already exists for resource %s", args.ResourceType))
+		return nil, nil, nil
+	}
+
+	watcherDone := make(chan struct{}, 1)
+	serverDone := make(chan struct{}, 1)
+	ch := make(chan shared.WatchResourceResult, 1)
+
+	watcher := h.watchReleases(args, watcherDone)
+	// if err != nil {
+	// 	return nil, nil, shared.LogError("failed to watch over resource %s: %v", args.ResourceType, err)
+	// }
+
+	go func() {
+		shared.LogDebug("plugin routine 2: resource watcher has been started for resource type (%s)", args.ResourceType)
+		defer shared.LogDebug("plugin routine 2: resource watcher has been stopped for resource type (%s)", args.ResourceType)
+
+		for v := range watcher {
+			ch <- shared.WatchResourceResult{
+				Type:   strings.ToLower("updated"),
+				Result: v,
+			}
+		}
+	}()
+
+	h.resourceWatcherChanMap[args.ResourceType] = channels{watcherDone: watcherDone, serverDone: serverDone}
 	return ch, serverDone, nil
 }
 
 func (h *Helm) GetResourceTypeSchema(resourceType string) (*proto.ResourceTransformer, error) {
+	if h.isOK != nil {
+		return nil, h.isOK
+	}
+	t, ok := h.resourceTypeConfigurations[resourceType]
+	if !ok {
+		h.logger.Trace(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
+		return h.resourceTypeConfigurations["defaults"], nil
+	}
+
 	return t, nil
 }
 
 func (h *Helm) GetResourceTypeList() ([]string, error) {
-	return []string{"repos", "charts", "releases"}, nil
+	return []string{"repos", "releases", "namespaces"}, nil
 }
 
 // TODO: test & fix this
 func (h *Helm) GetAuthInfo() (*proto.AuthInfoResponse, error) {
+	if h.isOK != nil {
+		return nil, h.isOK
+	}
+	authInfo := new(proto.AuthInfoResponse)
 
+	for _, kc := range h.kubeCLIconfig.KubeConfigs {
+		for _, c := range kc.Contexts {
+			authInfo.AuthInfo = append(authInfo.AuthInfo, &proto.AuthInfo{
+				IdentifyingName:  kc.Name,
+				Name:             c.Name,
+				DefaultIsolators: c.DefaultNamespacesToShow,
+				IsDefault:        c.IsDefault,
+				Info:             map[string]string{},
+				Path:             kc.Path,
+			})
+		}
+	}
 	return authInfo, nil
 }
 
@@ -68,21 +176,21 @@ func (h *Helm) GetSupportedActions() (*proto.GetActionListResponse, error) {
 				KeyBinding: "ctrl-y",
 				OutputType: "string",
 			},
-			{
-				Name:       "create",
-				KeyBinding: "ctrl-b",
-				OutputType: "string",
-			},
-			{
-				Name:       "edit",
-				KeyBinding: "ctrl-e",
-				OutputType: "bidirectional",
-			},
-			{
-				Name:       "delete",
-				KeyBinding: "ctrl-d",
-				OutputType: "nothing",
-			},
+			// {
+			// 	Name:       "create",
+			// 	KeyBinding: "ctrl-b",
+			// 	OutputType: "string",
+			// },
+			// {
+			// 	Name:       "edit",
+			// 	KeyBinding: "ctrl-e",
+			// 	OutputType: "bidirectional",
+			// },
+			// {
+			// 	Name:       "delete",
+			// 	KeyBinding: "ctrl-d",
+			// 	OutputType: "nothing",
+			// },
 			{
 				Name:       "refresh",
 				KeyBinding: "ctrl-r",
@@ -107,112 +215,15 @@ func (h *Helm) ActionUpdateResource(args *proto.ActionUpdateResourceArgs) error 
 }
 
 func (h *Helm) GetSpecficActionList(resourceType string) (*proto.GetActionListResponse, error) {
+	t, ok := h.resourceTypeConfigurations[resourceType]
+	if !ok {
+		h.logger.Trace(fmt.Sprintf("specific action list schema of resource type %s not found, using the default schema", resourceType))
+		t = h.resourceTypeConfigurations["defaults"]
+	}
+
 	return &proto.GetActionListResponse{Actions: t.SpecificActions}, nil
 }
 
 func (h *Helm) PerformSpecificAction(args *proto.SpecificActionArgs) (*proto.SpecificActionResult, error) {
-
-	switch args.ActionName {
-
-	case "describe":
-		// result, err := d.DescribeResource(args.ResourceType, args.ResourceName, args.IsolatorName)
-		// if err != nil {
-		// 	return nil, err
-		// }
-
-		// return &proto.SpecificActionResult{
-		// 	Result: result,
-		// 	// TODO: Output type should come from an core SDK
-		// 	OutputType: "string",
-		// }, nil
-
-	case "decode-secret":
-		items, err := d.GetResources(&proto.GetResourcesArgs{
-			ResourceName: args.ResourceName,
-			ResourceType: args.ResourceType,
-			IsolatorId:   args.IsolatorName,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = d.decodeSecret(items[0])
-		if err != nil {
-			return nil, err
-		}
-
-		return &proto.SpecificActionResult{
-			Result: nil,
-			// TODO: Output type should come from an core SDK
-			OutputType: "string",
-		}, nil
-
-	case "logs":
-
-		// containerName := ""
-		// if args.ResourceType == "containers" {
-		// 	parentName := args.Args["parentName"]
-		// 	args.ResourceType = "pods"
-		// 	containerName = args.ResourceName
-		// 	args.ResourceName = parentName.AsInterface().(string)
-		// }
-
-		// res, err := d.getPodLogs(args.ResourceName, args.IsolatorName, containerName)
-		// if err != nil {
-		// 	return nil, err
-		// }
-
-		// return shared.SpecificActionResult{
-		// 	Result:     res,
-		// 	OutputType: "string",
-		// }, nil
-
-	case "shell":
-
-		// containerName := ""
-		// if args.ResourceType == "containers" {
-		// 	parentName := args.Args["parentName"]
-		// 	args.ResourceType = "pods"
-		// 	containerName = args.ResourceName
-		// 	args.ResourceName = parentName.(string)
-		// }
-
-		// res, err := d.execPod(args.ResourceName, args.IsolatorName, containerName)
-		// if err != nil {
-		// 	return shared.SpecificActionResult{}, err
-		// }
-
-		// return shared.SpecificActionResult{
-		// 	Result:     res,
-		// 	OutputType: "string",
-		// }, nil
-
-	case "port-forward":
-
-		// res, err := d.portForward(args.ResourceName, args.IsolatorName, args.Args)
-		// if err != nil {
-		// 	return shared.SpecificActionResult{}, err
-		// }
-
-		// return shared.SpecificActionResult{
-		// 	Result:     res,
-		// 	OutputType: "string",
-		// }, nil
-
-	case "view-pods":
-		// res, err := d.getPods(context.Background(), args.IsolatorName, args.ResourceName, args.ResourceType)
-		// if err != nil {
-		// 	return shared.SpecificActionResult{}, err
-		// }
-		// return shared.SpecificActionResult{
-		// 	Result: res,
-		// 	// TODO: Output type should come from an core SDK
-		// 	OutputType: "invoke-event",
-		// }, nil
-
-	case "close":
-
-	}
-
 	return nil, nil
 }

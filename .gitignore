@@ -14,9 +14,8 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 cmd/devops/devops
-plugin/plugin
 plugins/kubernetes/kubernetes
-plugins/aws/aws/aws
+plugins/helm/helm
 frontend/devops
 
 *.csv

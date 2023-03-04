@@ -171,7 +171,7 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 				}
 			}
 
-			namespaces := []string{"default"}
+			namespaces := []string{"all", "default"}
 			if ctx.Namespace != "" && ctx.Namespace != "default" {
 				namespaces = append(namespaces, ctx.Namespace)
 			}
