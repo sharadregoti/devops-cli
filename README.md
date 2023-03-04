@@ -17,7 +17,7 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 ## Installation
 **Linux & Mac**
 
-`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.3.0/install.sh | bash`
+`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.4.0/install.sh | bash`
 
 ## Usage
 
