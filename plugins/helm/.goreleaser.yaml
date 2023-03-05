@@ -1,0 +1,51 @@
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: devops-helm-plugin
+    flags:
+    - -tags=release
+    # - -o helm
+    main: .
+    binary: helm
+    goos:
+      - linux
+      # - windows
+      - darwin
+release:
+  disable: true
+  skip_upload: true
+
+archives:
+  - builds:
+    - devops-helm-plugin
+    id: devops-helm-plugin
+    name_template: "devops-helm-plugin_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - config.yaml
+      - src: resource_config
+        dst: resource_config
+        strip_parent: true
+    replacements:
+      # darwin: Darwin
+      # linux: Linux
+      # windows: Windows
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+blobs:
+  - provider: gs
+    bucket: devops-cli-artifacts
+    folder: "releases/devops/{{.Version}}"
+    ids:
+    - devops-helm-plugin

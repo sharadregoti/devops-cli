@@ -10,16 +10,6 @@ builds:
       - linux
       # - windows
       - darwin
-  - id: devops-kubernetes-plugin
-    flags:
-    - -tags=release
-    - -o kubernetes
-    main: ./plugin/kubernetes
-    binary: kubernetes
-    goos:
-      - linux
-      # - windows
-      - darwin
 release:
   disable: true
   skip_upload: true
@@ -35,26 +25,7 @@ archives:
       386: i386
       amd64: x86_64
     files:
-      - src: ./cmd/devops/config.yaml
-        dst: config.yaml
-        strip_parent: true
-  - builds:
-    - devops-kubernetes-plugin
-    id: devops-kubernetes-plugin
-    name_template: "devops-kubernetes-plugin_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files:
-      - src: plugin/kubernetes/resource_config
-        dst: resource_config
-        strip_parent: true
-      - src: plugin/kubernetes/config.yaml
-        dst: config.yaml
-        strip_parent: true
-    replacements:
-      # darwin: Darwin
-      # linux: Linux
-      # windows: Windows
-      386: i386
-      amd64: x86_64
+      - ./cmd/devops/config.yaml
 checksum:
   name_template: 'checksums.txt'
 snapshot:
@@ -72,6 +43,5 @@ blobs:
     folder: "releases/devops/{{.Version}}"
     ids:
     - devops-core
-    - devops-kubernetes-plugin
     extra_files:
     - glob: ./install.sh

@@ -1,8 +1,9 @@
-kube_configs:
-  - name: xlr8s-dev-cluster
-    path: "/home/sharad/xebia/dev2.kubeconfig"
-    contexts: 
-      - name: "default"
-        default_namespaces_to_show: 
-          - "default"
-          - "dev-xlr8s"
+# Example configuration
+# kube_configs:
+#   - name: aws-dev-cluster
+#     path: "/home/sharad/aws/dev2.kubeconfig"
+#     contexts: 
+#       - name: "default"
+#         default_namespaces_to_show: 
+#           - "default"
+#           - "dev-aws"

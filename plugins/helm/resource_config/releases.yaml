@@ -6,34 +6,76 @@
 operations:
   - name: "namespace"
     json_paths: 
-    - path: ""
+    - path: "namespace"
     output_format: ""
   - name: "name"
     json_paths: 
-    - path: ""
+    - path: "name"
     output_format: ""
   - name: "revision"
     json_paths: 
-    - path: ""
+    - path: "revision"
     output_format: ""
   - name: "updated"
     json_paths: 
-    - path: ""
+    - path: "updated"
     output_format: ""
   - name: "status"
     json_paths: 
-    - path: ""
+    - path: "status"
     output_format: ""
   - name: "chart"
     json_paths: 
-    - path: ""
+    - path: "chart"
     output_format: ""
   - name: "app_version"
     json_paths: 
-    - path: ""
+    - path: "app_version"
     output_format: ""
 styles:
   - row_background_color: lightskyblue
     conditions:
     - 'true'
 specific_actions:
+  - name: "show hooks"
+    key_binding: "o"
+    execution:
+      cmd: |
+        #!/bin/bash
+        helm get hooks {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --kube-context {{.authName}}
+    output_type: "string"
+  - name: "show manifest"
+    key_binding: "m"
+    execution:
+      cmd: |
+        #!/bin/bash
+        helm get manifest {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --kube-context {{.authName}}
+    output_type: "string"
+  - name: "show values"
+    key_binding: "v"
+    execution:
+      cmd: |
+        #!/bin/bash
+        helm get values {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --kube-context {{.authName}}
+    output_type: "string"
+  - name: "show history"
+    key_binding: "h"
+    execution:
+      cmd: |
+        #!/bin/bash
+        helm history {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --kube-context {{.authName}}
+    output_type: "string"
+  - name: "rollback"
+    key_binding: "r"
+    execution:
+      cmd: |
+        #!/bin/bash
+        helm rollback {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --kube-context {{.authName}}
+    output_type: "string"
+  - name: "uninstall"
+    key_binding: "u"
+    execution:
+      cmd: |
+        #!/bin/bash
+        helm uninstall {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --kube-context {{.authName}}
+    output_type: "string"

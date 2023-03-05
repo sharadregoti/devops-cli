@@ -65,7 +65,9 @@ func (a *Application) getAppConfig() (*model.Config, error) {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, a.flashLogError("Get app config request failed: received %v status code from server", res.Status)
+		msg := new(model.ErrorResponse)
+		_ = json.NewDecoder(res.Body).Decode(msg)
+		return nil, a.flashLogError("Get app config request failed: received %v status code from server with error %v", res.Status, msg.Message)
 	}
 
 	msg := new(model.Config)
@@ -78,11 +80,13 @@ func (a *Application) getPluginAuths(pluginName string) (*model.AuthResponse, er
 	u := url.URL{Scheme: "http", Host: a.addr, Path: fmt.Sprintf("/v1/auth/%s", pluginName)}
 	res, err := http.Get(u.String())
 	if err != nil {
-		return nil, a.flashLogError("Failed to send get app config request: %v", err.Error())
+		return nil, a.flashLogError("Failed to send get plugin auths request: %v", err.Error())
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, a.flashLogError("Get app config request failed: received %v status code from server", res.Status)
+		msg := new(model.ErrorResponse)
+		_ = json.NewDecoder(res.Body).Decode(msg)
+		return nil, a.flashLogError("Get plugin auth request failed: received %v status code from server with error %v", res.Status, msg.Message)
 	}
 
 	msg := new(model.AuthResponse)

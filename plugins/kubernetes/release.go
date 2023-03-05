@@ -1,7 +1,7 @@
 //go:build release
 // +build release
 
-package kubernetes
+package main
 
 func init() {
 	release = true

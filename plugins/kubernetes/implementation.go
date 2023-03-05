@@ -108,6 +108,9 @@ func (d *Kubernetes) Connect(authInfo *proto.AuthInfo) error {
 }
 
 func (d *Kubernetes) GetResources(args *proto.GetResourcesArgs) ([]interface{}, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 
 	label := ""
 	for k, v := range args.Args {
@@ -132,6 +135,9 @@ func (d *Kubernetes) GetResources(args *proto.GetResourcesArgs) ([]interface{}, 
 
 // TODO: test & fix this
 func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
+	if d.isOK != nil {
+		return d.isOK
+	}
 	// res, ok := d.resourceWatcherChanMap[resourceType]
 	// if !ok {
 	// 	return shared.LogError("channel for resource type %s does not exists", resourceType)
@@ -145,6 +151,10 @@ func (d *Kubernetes) CloseResourceWatcher(resourceType string) error {
 
 // TODO: test & fix this
 func (d *Kubernetes) WatchResources(args *proto.GetResourcesArgs) (chan shared.WatchResourceResult, chan struct{}, error) {
+	if d.isOK != nil {
+		return nil, nil, d.isOK
+	}
+
 	if len(d.resourceWatcherChanMap) > 0 {
 		for k, v := range d.resourceWatcherChanMap {
 			d.logger.Trace(fmt.Sprintf("Invoking close resource watcher event for resource type %s", k))
@@ -168,6 +178,7 @@ func (d *Kubernetes) WatchResources(args *proto.GetResourcesArgs) (chan shared.W
 	watcherDone := make(chan struct{}, 1)
 	serverDone := make(chan struct{}, 1)
 	ch := make(chan shared.WatchResourceResult, 1)
+
 	go func() {
 		shared.LogDebug("plugin routine: resource watcher has been started for resource type (%s)", args.ResourceType)
 		defer shared.LogDebug("plugin routine: resource watcher has been stopped for resource type (%s)", args.ResourceType)
@@ -240,6 +251,9 @@ func convertToMap(obj runtime.Object) (map[string]interface{}, error) {
 }
 
 func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (*proto.ResourceTransformer, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 	t, ok := d.resourceTypeConfigurations[resourceType]
 	if !ok {
 		d.logger.Trace(fmt.Sprintf("Schema of resource type %s not found, using the default schema", resourceType))
@@ -250,6 +264,9 @@ func (d *Kubernetes) GetResourceTypeSchema(resourceType string) (*proto.Resource
 }
 
 func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 	resp := []string{}
 	for r := range d.resourceTypes {
 		resp = append(resp, r)
@@ -261,14 +278,13 @@ func (d *Kubernetes) GetResourceTypeList() ([]string, error) {
 
 // TODO: test & fix this
 func (d *Kubernetes) GetAuthInfo() (*proto.AuthInfoResponse, error) {
+	if d.isOK != nil {
+		return nil, d.isOK
+	}
 	authInfo := new(proto.AuthInfoResponse)
 
-	shared.LogDebug("GetAuthInfo Called")
-
 	for _, kc := range d.kubeCLIconfig.KubeConfigs {
-		shared.LogDebug("Path Is ==== %s", kc.Path)
 		for _, c := range kc.Contexts {
-			shared.LogDebug("Path is ==== Love %s %s", kc.Path, c.Name)
 			authInfo.AuthInfo = append(authInfo.AuthInfo, &proto.AuthInfo{
 				IdentifyingName:  kc.Name,
 				Name:             c.Name,
@@ -279,24 +295,6 @@ func (d *Kubernetes) GetAuthInfo() (*proto.AuthInfoResponse, error) {
 			})
 		}
 	}
-
-	// v, err := d.normalClient.ServerVersion()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to load server version: %w", err)
-	// }
-
-	// cc := d.clientConfig.CurrentContext
-	// user := ""
-
-	// context, ok := d.clientConfig.Contexts[cc]
-	// if ok {
-	// 	user = context.AuthInfo
-	// }
-
-	// server := ""
-	// for _, c := range d.clientConfig.Clusters {
-	// 	server = c.Server
-	// }
 
 	return authInfo, nil
 }
@@ -345,6 +343,9 @@ func (d *Kubernetes) GetSupportedActions() (*proto.GetActionListResponse, error)
 }
 
 func (d *Kubernetes) ActionDeleteResource(args *proto.ActionDeleteResourceArgs) error {
+	if d.isOK != nil {
+		return d.isOK
+	}
 	return d.deleteResource(context.Background(), args)
 }
 

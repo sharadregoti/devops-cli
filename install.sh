@@ -136,7 +136,7 @@ downloadFile() {
     mkdir "$HOME/.devops/plugins"
     fi
 
-    # Check if the ".devops/plugins" directory already exists in the home directory
+    ######################## Kubernetes plugin ########################
     if [ ! -d "$HOME/.devops/plugins/kubernetes" ]; then
     # If it doesn't exist, create it
     mkdir "$HOME/.devops/plugins/kubernetes"
@@ -150,6 +150,19 @@ downloadFile() {
     wget -O "$HOME/.devops/plugins/kubernetes/devops.tar.gz" "${DOWNLOAD_URL}"
     tar -xzf "$HOME/.devops/plugins/kubernetes/devops.tar.gz" -C "$HOME/.devops/plugins/kubernetes"
 
+    ######################## Helm plugin ########################
+    if [ ! -d "$HOME/.devops/plugins/helm" ]; then
+    # If it doesn't exist, create it
+    mkdir "$HOME/.devops/plugins/helm"
+    fi
+
+    SPACE_CLI_ARTIFACT="devops-helm-plugin_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
+    DOWNLOAD_URL="${DOWNLOAD_BASE}/${SPACE_CLI_ARTIFACT}"
+
+    echo "Downloading helm plugin"
+
+    wget -O "$HOME/.devops/plugins/helm/devops.tar.gz" "${DOWNLOAD_URL}"
+    tar -xzf "$HOME/.devops/plugins/helm/devops.tar.gz" -C "$HOME/.devops/plugins/helm"
 }
 
 installFile() {
