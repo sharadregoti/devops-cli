@@ -33,7 +33,7 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 
 ## Supported Plugins
 - Kubernetes
-- Helm (WIP)
+- Helm
 - Gitlab (WIP)
 
 ### Kubernetes Features
@@ -41,3 +41,7 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 - Create, Read, Update, Delete any resource
 - Describe any resource
 - View logs, get shell access of pod
+
+### Helm Features
+- View releases & charts
+- Perform the following operation on releases: rollback, uninstall, view values, view history, view manifies etc...
