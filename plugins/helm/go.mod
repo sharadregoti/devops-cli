@@ -4,7 +4,10 @@ go 1.19
 
 replace github.com/sharadregoti/devops-plugin-sdk => ../../devops-plugin-sdk
 
-require github.com/sharadregoti/devops-plugin-sdk v0.0.0-00010101000000-000000000000
+require (
+	github.com/hashicorp/go-plugin v1.4.8
+	github.com/sharadregoti/devops-plugin-sdk v0.0.0-00010101000000-000000000000
+)
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
@@ -20,7 +23,6 @@ require (
 	github.com/go-gorp/gorp/v3 v3.0.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
-	github.com/hashicorp/go-plugin v1.4.8 // indirect
 	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
@@ -123,12 +125,12 @@ require (
 	google.golang.org/grpc v1.53.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	helm.sh/helm/v3 v3.11.1
 	k8s.io/api v0.26.0 // indirect
-	k8s.io/apimachinery v0.26.0 // indirect
-	k8s.io/cli-runtime v0.26.0 // indirect
+	k8s.io/apimachinery v0.26.0
+	k8s.io/cli-runtime v0.26.0
 	k8s.io/client-go v0.26.0
 	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
