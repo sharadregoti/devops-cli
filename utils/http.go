@@ -11,8 +11,6 @@ import (
 	// "github.com/go-errors/errors"
 	"github.com/rs/cors"
 	"github.com/sharadregoti/devops/model"
-	// "github.com/xebiaww-apps/xlr8s-go/model/httptypes"
-	// "github.com/xebiaww-apps/xlr8s-go/utils/errors"
 )
 
 // CreateCorsObject creates a cors object with the required config

@@ -163,6 +163,14 @@ downloadFile() {
 
     wget -O "$HOME/.devops/plugins/helm/devops.tar.gz" "${DOWNLOAD_URL}"
     tar -xzf "$HOME/.devops/plugins/helm/devops.tar.gz" -C "$HOME/.devops/plugins/helm"
+
+    SPACE_CLI_ARTIFACT="devops-helm-plugin_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
+    DOWNLOAD_URL="${DOWNLOAD_BASE}/ui.tar.gz"
+
+    echo "Downloading UI"
+
+    wget -O "$HOME/.devops/ui.tar.gz" "${DOWNLOAD_URL}"
+    tar -xzf "$HOME/.devops/ui.tar.gz" -C "$HOME/.devops"
 }
 
 installFile() {

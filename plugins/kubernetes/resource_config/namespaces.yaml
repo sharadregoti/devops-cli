@@ -33,10 +33,10 @@ specific_actions:
         #!/bin/bash
         kubectl describe {{.resourceType}} {{.resourceName}} -n "{{.isolatorName}}" --kubeconfig {{.authPath}} --context {{.authName}}
     output_type: "string"
-  - name: "get all"
-    key_binding: "g"
-    execution:
-      cmd: |
-        #!/bin/bash
-        kubectl get-all --namespace={{.resourceName}} --kubeconfig {{.authPath}} --context {{.authName}}
-    output_type: "string"
+  # - name: "get all"
+  #   key_binding: "g"
+  #   execution:
+  #     cmd: |
+  #       #!/bin/bash
+  #       kubectl get-all --namespace={{.resourceName}} --kubeconfig {{.authPath}} --context {{.authName}}
+  #   output_type: "string"
