@@ -25,7 +25,10 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 
 `devops`
 
-**Run Server (Web App)**
+**Run Client (Web App)**
+
+![image](https://user-images.githubusercontent.com/24411676/230721653-a57f0eea-7629-4839-ba32-1eb6cb77415f.png)
+
 
 `On browser go to: http://localhost:9753`
 
