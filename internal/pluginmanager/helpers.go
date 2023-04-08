@@ -31,11 +31,7 @@ func ListPlugins() ([]*model.Plugin, error) {
 	var plugins []*model.Plugin
 	for _, entry := range entries {
 		if entry.IsDir() {
-			// // TODO: Remove this once helm plugin is moved to a separate repo
-			// if entry.Name() == "helm" {
-			// 	continue
-			// }
-			plugins = append(plugins, &model.Plugin{Name: entry.Name()})
+			plugins = append(plugins, &model.Plugin{Name: entry.Name(), IsDefault: entry.Name() == "kubernetes"})
 		}
 	}
 	return plugins, nil

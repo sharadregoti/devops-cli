@@ -31,12 +31,12 @@ func (srw WebsocketReadWriter) Read(p []byte) (n int, err error) {
 }
 
 type InfoResponse struct {
-	SessionID       string            `json:"id" yaml:"id"`
-	General         map[string]string `json:"general" yaml:"general"`
-	Actions         []*proto.Action   `json:"actions" yaml:"actions"`
-	ResourceTypes   []string          `json:"resourceTypes" yaml:"resourceTypes"`
-	DefaultIsolator []string          `json:"defaultIsolator" yaml:"defaultIsolator"`
-	IsolatorType    string            `json:"isolatorType" yaml:"isolatorType"`
+	SessionID       string            `json:"id" yaml:"id" binding:"required"`
+	General         map[string]string `json:"general" yaml:"general" binding:"required"`
+	Actions         []*proto.Action   `json:"actions" yaml:"actions" binding:"required"`
+	ResourceTypes   []string          `json:"resourceTypes" yaml:"resourceTypes" binding:"required"`
+	DefaultIsolator []string          `json:"defaultIsolator" yaml:"defaultIsolator" binding:"required"`
+	IsolatorType    string            `json:"isolatorType" yaml:"isolatorType" binding:"required"`
 }
 
 // type Action struct {
@@ -51,7 +51,7 @@ type InfoResponse struct {
 
 type FrontendEvent struct {
 	EventType    EventType              `json:"eventType" yaml:"eventType"`
-	ActionName   string                 `json:"name" yaml:"name"`
+	ActionName   string                 `json:"name" yaml:"name" enums:"read,delete,update,create,edit,view-long-running,delete-long-running,resource-type-change,isolator-change,refresh-resource"`
 	ResourceType string                 `json:"resourceType" yaml:"resourceType"`
 	ResourceName string                 `json:"resourceName" yaml:"resourceName"`
 	IsolatorName string                 `json:"isolatorName" yaml:"isolatorName"`

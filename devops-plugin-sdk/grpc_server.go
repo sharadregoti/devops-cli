@@ -49,6 +49,8 @@ func (g *GRPCServer) WatchResources(args *proto.GetResourcesArgs, server proto.D
 	// fmt package does not work here. Only log, hclog works
 	ch, done, err := g.Impl.WatchResources(args)
 	if err != nil {
+		// TODO: Errors sent from here does not reach the core client -> core binary
+		log.Printf("Error has occured watcher 3")
 		return err
 	}
 

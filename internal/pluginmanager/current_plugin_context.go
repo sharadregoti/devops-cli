@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	shared "github.com/sharadregoti/devops-plugin-sdk"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/internal/transformer"
@@ -46,6 +47,8 @@ type CurrentPluginContext struct {
 
 	eventChan chan model.Event
 
+	wsConn *websocket.Conn
+
 	done chan struct{}
 
 	pc *PluginClient
@@ -56,6 +59,7 @@ type CurrentPluginContext struct {
 
 type actionsToExecute struct {
 	isExecuted bool
+	cmd        string
 	e          model.Event
 }
 
@@ -103,11 +107,11 @@ func initPluginContext(p shared.Devops, pluginName string, eventChan chan model.
 		return nil, err
 	}
 
-	actions.Actions = append(actions.Actions, &proto.Action{
-		Name:       string(model.ViewLongRunning),
-		KeyBinding: "ctrl-l",
-		OutputType: model.OutputTypeString,
-	})
+	// actions.Actions = append(actions.Actions, &proto.Action{
+	// 	Name:       string(model.ViewLongRunning),
+	// 	KeyBinding: "ctrl-l",
+	// 	OutputType: model.OutputTypeString,
+	// })
 
 	cpc := &CurrentPluginContext{
 		currentPluginName:     pluginName,

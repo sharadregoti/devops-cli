@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"fmt"
 	"syscall"
 
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
@@ -22,8 +23,10 @@ func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
 
 	ch, _, err := c.plugin.WatchResources(&proto.GetResourcesArgs{ResourceType: e.ResourceType, IsolatorId: e.IsolatorName})
 	if err != nil {
+		fmt.Println("Error has occured watcher 1")
 		return logger.LogError("Error while starting watcher", err)
 	}
+	fmt.Println("Error has occured watcher 2")
 
 	done := make(chan struct{}, 1)
 	// TODO: Writing to c.done does not close this go routine
@@ -53,6 +56,25 @@ func (c *CurrentPluginContext) ResourceChanged(e model.Event) error {
 				specificActions, err := c.plugin.GetSpecficActionList(e.ResourceType)
 				if err != nil {
 					return
+				}
+
+				if r.Type == "deleted" {
+					for _, lri := range c.longRunning {
+						fmt.Println("Resource deleted, killing long process with pid", lri.GetCMD().Process.Pid)
+						syscall.Kill(-lri.GetCMD().Process.Pid, syscall.SIGTERM)
+					}
+				}
+
+				for _, i := range schema.SpecificActions {
+					if i.Execution != nil && i.Execution.IsLongRunning {
+						specificActions.Actions = append(specificActions.Actions, &proto.Action{
+							Name:       string(model.ViewLongRunning),
+							KeyBinding: "l",
+							OutputType: model.OutputTypeEvent,
+						})
+						// isLongRunning = true
+						break
+					}
 				}
 
 				c.SendMessage(model.WebsocketResponse{

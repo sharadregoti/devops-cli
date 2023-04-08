@@ -8,6 +8,155 @@
     },
     "host": "localhost:4949",
     "paths": {
+        "/v1/auth/{pluginName}": {
+            "get": {
+                "description": "HandleAuth endpoint",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "HandleAuth endpoint",
+                "operationId": "HandleAuth",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "name of pluging to use",
+                        "name": "pluginName",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/config": {
+            "get": {
+                "description": "HandleConfig endpoint",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "HandleConfig endpoint",
+                "operationId": "HandleConfig",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Config"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/connect/{pluginName}/{authId}/{contextId}": {
+            "get": {
+                "description": "HandleInfo endpoint",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "HandleInfo endpoint",
+                "operationId": "HandleInfo",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "name of pluging to use",
+                        "name": "pluginName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name of authentication to use",
+                        "name": "authId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name of the context in authentication to use",
+                        "name": "contextId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.InfoResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/events/{id}": {
             "post": {
                 "description": "HandleEvent endpoint",
@@ -19,6 +168,24 @@
                 ],
                 "summary": "HandleEvent endpoint",
                 "operationId": "HandleEvent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id of the client",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "comment",
+                        "name": "model.FrontendEvent",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.FrontendEvent"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -46,69 +213,35 @@
                     }
                 }
             }
-        },
-        "/v1/info": {
-            "get": {
-                "description": "HandleInfo endpoint",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "HandleInfo endpoint",
-                "operationId": "HandleInfo",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Info"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/model.ErrorResponse"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
-        "model.Action": {
+        "model.AuthResponse": {
             "type": "object",
             "properties": {
-                "key_binding": {
-                    "type": "string"
+                "auths": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/proto.AuthInfo"
+                    }
+                }
+            }
+        },
+        "model.Config": {
+            "type": "object",
+            "required": [
+                "plugins",
+                "server"
+            ],
+            "properties": {
+                "plugins": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Plugin"
+                    }
                 },
-                "name": {
-                    "description": "Name is the name to be shown on UI",
-                    "type": "string"
-                },
-                "output_type": {
-                    "description": "Output type can be",
-                    "type": "string"
-                },
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "type": {
-                    "description": "Type can be one of normal, special, internal",
-                    "type": "string"
+                "server": {
+                    "$ref": "#/definitions/model.Server"
                 }
             }
         },
@@ -129,17 +262,67 @@
                 "result": {}
             }
         },
-        "model.Info": {
+        "model.FrontendEvent": {
             "type": "object",
+            "properties": {
+                "args": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "eventType": {
+                    "type": "string"
+                },
+                "isolatorName": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "enum": [
+                        "read",
+                        "delete",
+                        "update",
+                        "create",
+                        "edit",
+                        "view-long-running",
+                        "delete-long-running",
+                        "resource-type-change",
+                        "isolator-change",
+                        "refresh-resource"
+                    ]
+                },
+                "pluginName": {
+                    "type": "string"
+                },
+                "resourceName": {
+                    "type": "string"
+                },
+                "resourceType": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.InfoResponse": {
+            "type": "object",
+            "required": [
+                "actions",
+                "defaultIsolator",
+                "general",
+                "id",
+                "isolatorType",
+                "resourceTypes"
+            ],
             "properties": {
                 "actions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/model.Action"
+                        "$ref": "#/definitions/proto.Action"
                     }
                 },
                 "defaultIsolator": {
-                    "type": "string"
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "general": {
                     "type": "object",
@@ -153,17 +336,142 @@
                 "isolatorType": {
                     "type": "string"
                 },
-                "plugins": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
                 "resourceTypes": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "model.Plugin": {
+            "type": "object",
+            "required": [
+                "isDefault",
+                "name"
+            ],
+            "properties": {
+                "isDefault": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Server": {
+            "type": "object",
+            "required": [
+                "address"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                }
+            }
+        },
+        "proto.Action": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/structpb.Value"
+                    }
+                },
+                "execution": {
+                    "$ref": "#/definitions/proto.Execution"
+                },
+                "key_binding": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "output_type": {
+                    "type": "string"
+                },
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/structpb.Value"
+                    }
+                }
+            }
+        },
+        "proto.AuthInfo": {
+            "type": "object",
+            "properties": {
+                "default_isolators": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "identifying_name": {
+                    "type": "string"
+                },
+                "info": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "proto.Execution": {
+            "type": "object",
+            "properties": {
+                "cmd": {
+                    "type": "string"
+                },
+                "is_long_running": {
+                    "type": "boolean"
+                },
+                "server_input": {
+                    "$ref": "#/definitions/proto.ServerInput"
+                },
+                "user_input": {
+                    "$ref": "#/definitions/proto.UserInput"
+                }
+            }
+        },
+        "proto.ServerInput": {
+            "type": "object",
+            "properties": {
+                "required": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "proto.UserInput": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/structpb.Value"
+                    }
+                },
+                "required": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "structpb.Value": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "description": "The kind of value.\n\nTypes that are assignable to Kind:\n\t*Value_NullValue\n\t*Value_NumberValue\n\t*Value_StringValue\n\t*Value_BoolValue\n\t*Value_StructValue\n\t*Value_ListValue"
                 }
             }
         }

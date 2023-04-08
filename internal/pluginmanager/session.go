@@ -2,7 +2,9 @@ package pluginmanager
 
 import (
 	"fmt"
+	"syscall"
 
+	"github.com/gorilla/websocket"
 	"github.com/sharadregoti/devops-plugin-sdk/proto"
 	"github.com/sharadregoti/devops/model"
 	"github.com/sharadregoti/devops/utils/logger"
@@ -35,7 +37,23 @@ func (s *SessionManager) DeleteClient(ID string) {
 		return
 	}
 	pCtx.Close()
+	pCtx.wsConn.Close()
 	delete(s.m, ID)
+}
+
+func (s *SessionManager) SetWSConn(ID string, conn *websocket.Conn) {
+	info := s.m[ID]
+	info.c.wsConn = conn
+}
+
+func (s *SessionManager) KillAllLongSessions() {
+	fmt.Println("Killing all sessions")
+	for _, m := range s.m {
+		for _, lri := range m.c.longRunning {
+			fmt.Println("Killing process with pid", lri.GetCMD().Process.Pid)
+			syscall.Kill(-lri.GetCMD().Process.Pid, syscall.SIGTERM)
+		}
+	}
 }
 
 func (s *SessionManager) GetClient(ID string) (*CurrentPluginContext, error) {
@@ -64,5 +82,5 @@ func (s *SessionManager) AddClient(ID, pluginName, authID, contextID string) err
 		logger.LogInfo("New client with ID (%s) is added", ID)
 		return nil
 	}
-	return fmt.Errorf("session with this id already exists")
+	return fmt.Errorf("session with id (%s) already exists", ID)
 }

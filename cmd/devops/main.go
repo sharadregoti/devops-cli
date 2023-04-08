@@ -7,7 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/sharadregoti/devops/common"
@@ -136,10 +138,20 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			if err := s.Start(); err != nil {
-				return err
-			}
+			go func() {
+				if err := s.Start(); err != nil {
+					log.Fatal(err)
+				}
+			}()
 
+			// Listen for OS signals to terminate the program
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+			// Wait for the termination signal
+			<-sigCh
+
+			s.Sm.KillAllLongSessions()
 			return nil
 		},
 	}

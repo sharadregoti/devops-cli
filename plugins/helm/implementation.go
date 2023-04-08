@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -29,11 +30,24 @@ func (h *Helm) Connect(authInfo *proto.AuthInfo) error {
 			}
 		}
 	}
+	shared.LogDebug("Connecting to kubernetes cluster at path %s with context %s", kubeConfigPath, authInfo.Name)
 
-	restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	// contextName := "my-context" // replace with the name of your context
+	restConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath},
+		&clientcmd.ConfigOverrides{
+			CurrentContext: authInfo.Name,
+		}).ClientConfig()
+	// clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(clientcmd.NewDefaultClientConfigLoadingRules(), &clientcmd.ConfigOverrides{CurrentContext: authInfo.Name})
+	// restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return shared.LogError("failed to build config from flags: %v", err)
+		return shared.LogError("failed to get client config for context %s: %v", authInfo.Name, err)
 	}
+
+	// restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath, "")
+	// if err != nil {
+	// 	return shared.LogError("failed to build config from flags: %v", err)
+	// }
 
 	// Normal client
 	clientset, err := kubernetes.NewForConfig(restConfig)
@@ -44,16 +58,24 @@ func (h *Helm) Connect(authInfo *proto.AuthInfo) error {
 	shared.LogDebug("Connecting to kubernetes cluster at path %s with context %s", kubeConfigPath, authInfo.Name)
 	h.normalClient = clientset
 	h.restConfig = restConfig
+	h.currentContext = authInfo.Name
+	h.currentKubeConfigPath = kubeConfigPath
+
+	resp := clientset.CoreV1().RESTClient().Get().AbsPath("/").Do(context.Background())
+	var statusCode = 0
+	if resp.StatusCode(&statusCode); statusCode != 200 {
+		return shared.LogError("failed to perform ping test: unexpected status code: %d", resp.StatusCode)
+	}
 
 	return nil
 }
 
 func (h *Helm) GetResources(args *proto.GetResourcesArgs) ([]interface{}, error) {
 	switch args.ResourceType {
-	// case "repos":
-	// 	return listRepos()
-	// case "charts":
-	// return listCharts()
+	case "repos":
+		return h.listRepos()
+	case "namespaces":
+		return h.listNamespaces(args)
 	case "releases":
 		return h.listReleases(args)
 	default:

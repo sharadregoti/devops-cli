@@ -2,3 +2,5 @@ server:
   address: ":9753"
 plugins:
   - name: kubernetes
+    isDefault: true
+  - name: helm

@@ -7,3 +7,11 @@
 #         default_namespaces_to_show: 
 #           - "default"
 #           - "dev-aws"
+kube_configs:
+  - name: xebia-dev-cluster
+    path: "/home/sharad/xebia/dev2.kubeconfig"
+    contexts:
+      - name: "default"
+        default_namespaces_to_show:
+          - "default"
+          - "stable-xlr8s-0-6-1"

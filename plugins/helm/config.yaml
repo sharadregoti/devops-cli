@@ -1,9 +1,9 @@
 # Example configuration
-# kube_configs:
-#   - name: aws-dev-cluster
-#     path: "/home/sharad/aws/dev2.kubeconfig"
-#     contexts: 
-#       - name: "default"
-#         default_namespaces_to_show: 
-#           - "default"
-#           - "dev-aws"
+kube_configs:
+  - name: xebia-dev-cluster
+    path: "/home/sharad/xebia/dev2.kubeconfig"
+    contexts:
+      - name: "default"
+        default_namespaces_to_show:
+          - "default"
+          - "dev-xlr8s"

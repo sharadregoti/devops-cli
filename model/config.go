@@ -9,17 +9,19 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+// Config stores app config
 type Config struct {
-	Server  *Server   `json:"server" yaml:"server"`
-	Plugins []*Plugin `json:"plugins" yaml:"plugins"`
+	Server  *Server   `json:"server" yaml:"server" binding:"required"`
+	Plugins []*Plugin `json:"plugins" yaml:"plugins" binding:"required"`
 }
 
 type Server struct {
-	Address string `json:"address" yaml:"address"`
+	Address string `json:"address" yaml:"address" binding:"required"`
 }
 
 type Plugin struct {
-	Name string `json:"name" yaml:"name"`
+	Name      string `json:"name" yaml:"name" binding:"required"`
+	IsDefault bool   `json:"isDefault" yaml:"isDefault" binding:"required"`
 }
 
 // Creates .devops directory if it does not exists

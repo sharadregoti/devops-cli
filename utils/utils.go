@@ -66,18 +66,18 @@ func ExecuteCMDGetOutput(cmdStr string) (string, error) {
 	return string(output), nil
 }
 
-func ExecuteCMDLong(cmdStr string) error {
-	// Set the command to execute
-	arr := strings.Split(cmdStr, " ")
+// func ExecuteCMDLong(cmdStr string) error {
+// 	// Set the command to execute
+// 	arr := strings.Split(cmdStr, " ")
 
-	// Execute the command
-	err := exec.Command(arr[0], arr[1:]...).Start()
-	if err != nil {
-		return logger.LogError("Error while executing command: %s", err)
-	}
+// 	// Execute the command
+// 	err := exec.Command(arr[0], arr[1:]...).Start()
+// 	if err != nil {
+// 		return logger.LogError("Error while executing command: %s", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func ExecuteCMD(cmdStr string) error {
 	// Create arbitrary command.
