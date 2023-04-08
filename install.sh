@@ -101,7 +101,7 @@ getLatestRelease() {
 downloadFile() {
     LATEST_RELEASE_TAG=$1
 
-    SPACE_CLI_ARTIFACT="devops_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
+    SPACE_CLI_ARTIFACT="devops-cli_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
     # https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.1.0/devops_0.1.0_Linux_arm64.tar.gz
     DOWNLOAD_BASE="https://storage.googleapis.com/devops-cli-artifacts/releases/devops/${LATEST_RELEASE_TAG}"
     DOWNLOAD_URL="${DOWNLOAD_BASE}/${SPACE_CLI_ARTIFACT}"
@@ -170,11 +170,13 @@ downloadFile() {
     echo "Downloading UI"
 
     wget -O "$HOME/.devops/ui.tar.gz" "${DOWNLOAD_URL}"
-    tar -xzf "$HOME/.devops/ui.tar.gz" -C "$HOME/.devops"
+    tar -xzvf "$HOME/.devops/ui.tar.gz" -C "$HOME/.devops"
 }
 
 installFile() {
+    echo "Starting installation... ${ARTIFACT_TMP_FILE}"
     tar xf "$ARTIFACT_TMP_FILE" -C "$SPACE_TMP_ROOT"
+    mv "$SPACE_TMP_ROOT/devops-cli" "$SPACE_TMP_ROOT/$SPACE_CLI_FILENAME"
     local tmp_root_space_cli="$SPACE_TMP_ROOT/$SPACE_CLI_FILENAME"
 
     if [ ! -f "$tmp_root_space_cli" ]; then

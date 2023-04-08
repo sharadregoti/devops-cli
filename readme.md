@@ -25,6 +25,10 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 
 `devops`
 
+**Run Server (Web App)**
+
+`On browser go to: http://localhost:9753`
+
 **Run Client (TUI)**
 
 `devops tui`
