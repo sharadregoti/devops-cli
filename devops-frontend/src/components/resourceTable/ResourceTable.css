@@ -1,0 +1,44 @@
+.lightskyblue {
+    background-color: lightskyblue;
+}
+
+.darkorange {
+    background-color: darkorange;
+}
+
+.gray {
+    background-color: gray;
+}
+
+.white {
+    background-color: white;
+}
+
+.mediumpurple {
+    background-color: mediumpurple;
+}
+
+.red {
+    background-color: red;
+}
+
+.yellow {
+    background-color: yellow;
+}
+
+.orange {
+    background-color: orange;
+}
+
+.green {
+    background-color: green;
+}
+
+.aqua {
+    background-color: aqua;
+}
+
+.highlighted {
+    background-color: white;
+    /* Change this color to your desired highlight color */
+}

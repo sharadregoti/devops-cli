@@ -1,3 +1,8 @@
+# Generating swagger docs
+# From root package
+swag init -g cmd/devops/main.go  --parseDependency
+
+
 step 1: Increment version number in code
 step 2: close all milestone & related issues mentioned in it
 step 3: release all binaries

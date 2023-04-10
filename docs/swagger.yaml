@@ -1,20 +1,22 @@
 definitions:
-  model.Action:
+  model.AuthResponse:
     properties:
-      key_binding:
-        type: string
-      name:
-        description: Name is the name to be shown on UI
-        type: string
-      output_type:
-        description: Output type can be
-        type: string
-      schema:
-        additionalProperties: true
-        type: object
-      type:
-        description: Type can be one of normal, special, internal
-        type: string
+      auths:
+        items:
+          $ref: '#/definitions/proto.AuthInfo'
+        type: array
+    type: object
+  model.Config:
+    properties:
+      plugins:
+        items:
+          $ref: '#/definitions/model.Plugin'
+        type: array
+      server:
+        $ref: '#/definitions/model.Server'
+    required:
+    - plugins
+    - server
     type: object
   model.ErrorResponse:
     properties:
@@ -27,14 +29,45 @@ definitions:
         type: string
       result: {}
     type: object
-  model.Info:
+  model.FrontendEvent:
+    properties:
+      args:
+        additionalProperties: true
+        type: object
+      eventType:
+        type: string
+      isolatorName:
+        type: string
+      name:
+        enum:
+        - read
+        - delete
+        - update
+        - create
+        - edit
+        - view-long-running
+        - delete-long-running
+        - resource-type-change
+        - isolator-change
+        - refresh-resource
+        type: string
+      pluginName:
+        type: string
+      resourceName:
+        type: string
+      resourceType:
+        type: string
+    type: object
+  model.InfoResponse:
     properties:
       actions:
         items:
-          $ref: '#/definitions/model.Action'
+          $ref: '#/definitions/proto.Action'
         type: array
       defaultIsolator:
-        type: string
+        items:
+          type: string
+        type: array
       general:
         additionalProperties:
           type: string
@@ -43,14 +76,102 @@ definitions:
         type: string
       isolatorType:
         type: string
-      plugins:
-        additionalProperties:
-          type: string
-        type: object
       resourceTypes:
         items:
           type: string
         type: array
+    required:
+    - actions
+    - defaultIsolator
+    - general
+    - id
+    - isolatorType
+    - resourceTypes
+    type: object
+  model.Plugin:
+    properties:
+      isDefault:
+        type: boolean
+      name:
+        type: string
+    required:
+    - isDefault
+    - name
+    type: object
+  model.Server:
+    properties:
+      address:
+        type: string
+    required:
+    - address
+    type: object
+  proto.Action:
+    properties:
+      args:
+        additionalProperties:
+          $ref: '#/definitions/structpb.Value'
+        type: object
+      execution:
+        $ref: '#/definitions/proto.Execution'
+      key_binding:
+        type: string
+      name:
+        type: string
+      output_type:
+        type: string
+      schema:
+        additionalProperties:
+          $ref: '#/definitions/structpb.Value'
+        type: object
+    type: object
+  proto.AuthInfo:
+    properties:
+      default_isolators:
+        items:
+          type: string
+        type: array
+      identifying_name:
+        type: string
+      info:
+        additionalProperties:
+          type: string
+        type: object
+      is_default:
+        type: boolean
+      name:
+        type: string
+      path:
+        type: string
+    type: object
+  proto.Execution:
+    properties:
+      cmd:
+        type: string
+      is_long_running:
+        type: boolean
+      server_input:
+        $ref: '#/definitions/proto.ServerInput'
+      user_input:
+        $ref: '#/definitions/proto.UserInput'
+    type: object
+  proto.ServerInput:
+    properties:
+      required:
+        type: boolean
+    type: object
+  proto.UserInput:
+    properties:
+      args:
+        additionalProperties:
+          $ref: '#/definitions/structpb.Value'
+        type: object
+      required:
+        type: boolean
+    type: object
+  structpb.Value:
+    properties:
+      kind:
+        description: "The kind of value.\n\nTypes that are assignable to Kind:\n\t*Value_NullValue\n\t*Value_NumberValue\n\t*Value_StringValue\n\t*Value_BoolValue\n\t*Value_StructValue\n\t*Value_ListValue"
     type: object
 host: localhost:4949
 info:
@@ -59,12 +180,124 @@ info:
   title: NEW Devops API
   version: v0.1.0
 paths:
+  /v1/auth/{pluginName}:
+    get:
+      consumes:
+      - application/json
+      description: HandleAuth endpoint
+      operationId: HandleAuth
+      parameters:
+      - description: name of pluging to use
+        in: path
+        name: pluginName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: HandleAuth endpoint
+  /v1/config:
+    get:
+      consumes:
+      - application/json
+      description: HandleConfig endpoint
+      operationId: HandleConfig
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Config'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: HandleConfig endpoint
+  /v1/connect/{pluginName}/{authId}/{contextId}:
+    get:
+      consumes:
+      - application/json
+      description: HandleInfo endpoint
+      operationId: HandleInfo
+      parameters:
+      - description: name of pluging to use
+        in: path
+        name: pluginName
+        required: true
+        type: string
+      - description: name of authentication to use
+        in: path
+        name: authId
+        required: true
+        type: string
+      - description: name of the context in authentication to use
+        in: path
+        name: contextId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.InfoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: HandleInfo endpoint
   /v1/events/{id}:
     post:
       consumes:
       - application/json
       description: HandleEvent endpoint
       operationId: HandleEvent
+      parameters:
+      - description: id of the client
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: comment
+        in: body
+        name: model.FrontendEvent
+        required: true
+        schema:
+          $ref: '#/definitions/model.FrontendEvent'
       produces:
       - application/json
       responses:
@@ -85,30 +318,4 @@ paths:
           schema:
             $ref: '#/definitions/model.ErrorResponse'
       summary: HandleEvent endpoint
-  /v1/info:
-    get:
-      consumes:
-      - application/json
-      description: HandleInfo endpoint
-      operationId: HandleInfo
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Info'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/model.ErrorResponse'
-      summary: HandleInfo endpoint
 swagger: "2.0"

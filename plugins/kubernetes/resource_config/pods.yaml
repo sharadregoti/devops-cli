@@ -1,74 +1,74 @@
 operations:
   - name: "namespace"
-    json_paths: 
-    - path: "metadata.namespace"
+    json_paths:
+      - path: "metadata.namespace"
     output_format: ""
   - name: "name"
-    json_paths: 
-    - path: "metadata.name"
+    json_paths:
+      - path: "metadata.name"
     output_format: ""
   - name: "ready"
     json_paths:
-    - path: "status.containerStatuses.#(ready==true)#|#"
-    - path: "status.containerStatuses.#"
+      - path: "status.containerStatuses.#(ready==true)#|#"
+      - path: "status.containerStatuses.#"
     output_format: "%v/%v"
   - name: "restarts"
     json_paths:
-    - path: "status.containerStatuses.0.restartCount"
+      - path: "status.containerStatuses.0.restartCount"
     output_format: ""
   - name: "status"
-    json_paths: 
-    - path: "devops.customCalculatedStatus"
+    json_paths:
+      - path: "devops.customCalculatedStatus"
     output_format: ""
   - name: "ip"
-    json_paths: 
-    - path: "status.podIP"
+    json_paths:
+      - path: "status.podIP"
     output_format: ""
   - name: "node"
-    json_paths: 
-    - path: "spec.nodeName"
+    json_paths:
+      - path: "spec.nodeName"
     output_format: ""
   - name: "age"
-    json_paths: 
-    - path: "metadata.creationTimestamp|@age"
+    json_paths:
+      - path: "metadata.creationTimestamp|@age"
     output_format: ""
 nesting:
   is_nested: true
   resource_type: "containers"
   args:
   # is_self_contained_in_parent: true
-  # parent_data_paths : 
+  # parent_data_paths :
   # - spec.containers
   # - spec.initContainers
 styles:
   - row_background_color: darkorange
     conditions:
-    - 'devops.customCalculatedStatus == "Pending"'
+      - 'devops.customCalculatedStatus == "Pending"'
   - row_background_color: white
     conditions:
-    - 'devops.customCalculatedStatus == "ContainerCreating" || devops.customCalculatedStatus == "PodInitializing"'
+      - 'devops.customCalculatedStatus == "ContainerCreating" || devops.customCalculatedStatus == "PodInitializing"'
   - row_background_color: aqua
     conditions:
-    - 'devops.customCalculatedStatus == "Initialized"'
+      - 'devops.customCalculatedStatus == "Initialized"'
   - row_background_color: gray
     conditions:
-    - 'devops.customCalculatedStatus == "Completed"'
+      - 'devops.customCalculatedStatus == "Completed"'
   - row_background_color: lightskyblue
     conditions:
-    - 'devops.customCalculatedStatus == "Running"'
+      - 'devops.customCalculatedStatus == "Running"'
   - row_background_color: mediumpurple
     conditions:
-    - 'devops.customCalculatedStatus == "Terminating"'
+      - 'devops.customCalculatedStatus == "Terminating"'
   - row_background_color: red
     conditions:
-    - 'true'
+      - "true"
 specific_actions:
   - name: "describe"
     key_binding: "d"
     execution:
       cmd: |
         #!/bin/bash
-        kubectl describe {{.resourceType}} {{.resourceName}} -n {{.isolatorName}} --kubeconfig {{.authPath}} --context {{.authName}}
+        kubectl describe {{.resourceType}} {{.resourceName}} -n "{{.isolatorName}}" --kubeconfig {{.authPath}} --context {{.authName}}
     output_type: "string"
   - name: "logs"
     key_binding: "l"
@@ -78,7 +78,7 @@ specific_actions:
         kubectl logs {{.resourceName}} -n {{.isolatorName}} -c {{(index .resource.spec.containers 0).name}} -f --kubeconfig {{.authPath}} --context {{.authName}}
         while :; do
           :
-        done        
+        done
     output_type: "stream"
   - name: "shell"
     key_binding: "s"
@@ -128,7 +128,7 @@ specific_actions:
               {{- end -}}
             {{- end -}}
           address: "localhost"
-      server_input: 
+      server_input:
         required: false
   - name: "port-forward"
     key_binding: "f"
@@ -159,39 +159,5 @@ specific_actions:
               {{- end -}}
             {{- end -}}
           address: "localhost"
-      server_input: 
+      server_input:
         required: false
-  - name: "what-is-this"
-    key_binding: "w"
-    output_type: "stream"
-    execution:
-      cmd: |
-        #!/bin/bash
-
-        my_var="
-        # What does the below Kubernetes resource YAML do?  Answer the question with below format.
-
-        What is this resource?
-        Why it is required?
-        How it does the intended work?
-
-        {{toYaml .resource | nindent 4}}
-        "
-
-        # go-open-ai is a CLI tool that uses OpenAI's GPT-3 API to generate answers to questions.
-        # Available at https://github.com/sharadregoti/go-open-ai
-        echo $my_var | go-open-ai
-
-        function clean_up {
-            # Perform program exit housekeeping
-            echo "Cleaning up..."
-            exit 0
-        }
-
-        trap clean_up SIGINT SIGTERM
-
-        while true; do
-            sleep 1
-        done
-
-      is_long_running: false

@@ -109,10 +109,15 @@ func (h *Helm) listReleases(args *proto.GetResourcesArgs) ([]interface{}, error)
 	actionConfig := new(action.Configuration)
 
 	// Create a ConfigFlags struct instance with initialized values from rest.Config
+	// h.restConfig.
 	gh := genericclioptions.NewConfigFlags(true)
-	gh.APIServer = &h.restConfig.Host
-	gh.BearerToken = &h.restConfig.BearerToken
-	gh.CAFile = &h.restConfig.CAFile
+	// gh.APIServer = &h.restConfig.Host
+	// gh.BearerToken = &h.restConfig.BearerToken
+	// gh.CAFile = &h.restConfig.CAFile
+	// var insecure = true
+	// gh.Insecure = &insecure
+	gh.KubeConfig = &h.currentKubeConfigPath
+	gh.Context = &h.currentContext
 	gh.Namespace = &args.IsolatorId
 
 	newIsolator := args.IsolatorId

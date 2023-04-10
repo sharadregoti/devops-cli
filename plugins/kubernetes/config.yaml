@@ -2,8 +2,8 @@
 # kube_configs:
 #   - name: aws-dev-cluster
 #     path: "/home/sharad/aws/dev2.kubeconfig"
-#     contexts: 
+#     contexts:
 #       - name: "default"
-#         default_namespaces_to_show: 
+#         default_namespaces_to_show:
 #           - "default"
 #           - "dev-aws"

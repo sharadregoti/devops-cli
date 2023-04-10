@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -10,8 +11,6 @@ import (
 	// "github.com/go-errors/errors"
 	"github.com/rs/cors"
 	"github.com/sharadregoti/devops/model"
-	// "github.com/xebiaww-apps/xlr8s-go/model/httptypes"
-	// "github.com/xebiaww-apps/xlr8s-go/utils/errors"
 )
 
 // CreateCorsObject creates a cors object with the required config
@@ -47,21 +46,12 @@ func SendErrorResponse(ctx context.Context, w http.ResponseWriter, statusCode in
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
-	// response := httptypes.ErrorResponse{
-	// 	Error: err.Error(),
-	// }
+	fmt.Println("Errror resposne 1 status has been sent")
 	response := model.ErrorResponse{
 		Message: err.Error(),
 	}
 
-	// newErr, ok := err.(errors.Error)
-	// if ok {
-	// 	response = httptypes.ErrorResponse{
-	// 		Error:   newErr.Error(),
-	// 		Message: newErr.UserMesage(),
-	// 	}
-	// }
-
+	fmt.Println("Errror resposne 2 message bing sent")
 	return json.NewEncoder(w).Encode(response)
 }
 

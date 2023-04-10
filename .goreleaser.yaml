@@ -4,8 +4,9 @@ before:
 builds:
   - id: devops-core
     flags:
-    - -tags=release
+      - -tags=release
     main: ./cmd/devops
+    binary: devops
     goos:
       - linux
       # - windows
@@ -16,7 +17,7 @@ release:
 
 archives:
   - builds:
-    - devops-core
+      - devops-core
     id: devops-core
     replacements:
       # darwin: Darwin
@@ -27,21 +28,21 @@ archives:
     files:
       - ./cmd/devops/config.yaml
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - "^docs:"
+      - "^test:"
 
 blobs:
   - provider: gs
     bucket: devops-cli-artifacts
     folder: "releases/devops/{{.Version}}"
     ids:
-    - devops-core
+      - devops-core
     extra_files:
-    - glob: ./install.sh
+      - glob: ./install.sh

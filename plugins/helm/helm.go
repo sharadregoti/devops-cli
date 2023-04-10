@@ -50,8 +50,9 @@ type Helm struct {
 
 	currentKubeConfigPath string
 
-	restConfig   *rest.Config
-	normalClient *kubernetes.Clientset
+	restConfig     *rest.Config
+	normalClient   *kubernetes.Clientset
+	currentContext string
 }
 
 type channels struct {
@@ -165,6 +166,19 @@ func New(logger hclog.Logger) (*Helm, error) {
 			namespaces := []string{"all", "default"}
 			if ctx.Namespace != "" && ctx.Namespace != "default" {
 				namespaces = append(namespaces, ctx.Namespace)
+			}
+
+			for i, localConfigCtx := range kc.Contexts {
+				isAllFound := false
+				for _, n := range localConfigCtx.DefaultNamespacesToShow {
+					if n == "all" {
+						isAllFound = true
+					}
+				}
+
+				if !isAllFound {
+					kc.Contexts[i].DefaultNamespacesToShow = append(kc.Contexts[i].DefaultNamespacesToShow, "all")
+				}
 			}
 
 			if !isContextFound {

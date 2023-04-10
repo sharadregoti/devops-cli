@@ -38,8 +38,10 @@ func (g *GRPCClient) GetResources(args *proto.GetResourcesArgs) ([]interface{}, 
 func (g *GRPCClient) WatchResources(args *proto.GetResourcesArgs) (chan WatchResourceResult, chan struct{}, error) {
 	resp, err := g.client.WatchResources(context.Background(), args)
 	if err != nil {
+		fmt.Printf("Error has occured watcher 4\n")
 		return nil, nil, err
 	}
+	fmt.Printf("Error has occured watcher 5\n")
 
 	ch := make(chan WatchResourceResult, 1)
 	done := make(chan struct{}, 1)

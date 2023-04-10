@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -16,17 +17,17 @@ import (
 	"github.com/sharadregoti/devops/utils/logger"
 )
 
-// HandleConfig gives info
+// HandleConfig gives app config
 // @Summary      HandleConfig endpoint
 // @ID           HandleConfig
 // @Description  HandleConfig endpoint
 // @Accept       json
 // @Produce      json
-// @Success      200 {object} model.Info true
+// @Success      200 {object} model.Config true
 // @Failure      400 {object} model.ErrorResponse true
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
-// @Router       /v1/info [get]
+// @Router       /v1/config [get]
 func HandleConfig(conf *model.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
@@ -36,17 +37,18 @@ func HandleConfig(conf *model.Config) http.HandlerFunc {
 	}
 }
 
-// HandleAuth gives info
+// HandleAuth gives auth info of a plugin
 // @Summary      HandleAuth endpoint
 // @ID           HandleAuth
 // @Description  HandleAuth endpoint
 // @Accept       json
 // @Produce      json
-// @Success      200 {object} model.Info true
+// @Param        pluginName path string true "name of pluging to use"
+// @Success      200 {object} model.AuthResponse true
 // @Failure      400 {object} model.ErrorResponse true
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
-// @Router       /v1/info [get]
+// @Router       /v1/auth/{pluginName} [get]
 func HandleAuth(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
@@ -65,17 +67,20 @@ func HandleAuth(sm *pm.SessionManager) http.HandlerFunc {
 	}
 }
 
-// HandleInfo gives info
+// HandleInfo gives info about a auth plugin
 // @Summary      HandleInfo endpoint
 // @ID           HandleInfo
 // @Description  HandleInfo endpoint
 // @Accept       json
 // @Produce      json
-// @Success      200 {object} model.Info true
+// @Param        pluginName path string true "name of pluging to use"
+// @Param        authId path string true "name of authentication to use"
+// @Param        contextId path string true "name of the context in authentication to use"
+// @Success      200 {object} model.InfoResponse true
 // @Failure      400 {object} model.ErrorResponse true
 // @Failure      404 {object} model.ErrorResponse true
 // @Failure      500 {object} model.ErrorResponse true
-// @Router       /v1/info [get]
+// @Router       /v1/connect/{pluginName}/{authId}/{contextId} [get]
 func HandleInfo(sm *pm.SessionManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(5)*time.Second)
@@ -86,15 +91,24 @@ func HandleInfo(sm *pm.SessionManager) http.HandlerFunc {
 		contextID := params["contextId"]
 		pluginName := params["pluginName"]
 
-		ID := fmt.Sprintf("%d", sm.SessionCount()+1)
+		// Seed the random number generator with the current time
+		rand.Seed(time.Now().UnixNano())
+
+		// Generate a random number between 1-1000
+		randomNum := rand.Intn(1000) + 1
+		ID := fmt.Sprintf("%d", randomNum)
 		if err := sm.AddClient(ID, pluginName, authID, contextID); err != nil {
-			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+			fmt.Println("Error is add", err)
+			err = utils.SendResponse(ctx, w, http.StatusBadRequest, map[string]string{"message": err.Error()})
+			// err = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
+			fmt.Println("Returning", err)
 			return
 		}
 
 		pCtx, err := sm.GetClient(ID)
 		if err != nil {
-			_ = utils.SendErrorResponse(r.Context(), w, http.StatusBadRequest, err)
+			fmt.Println("Error is", err)
+			_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 
@@ -108,6 +122,8 @@ func HandleInfo(sm *pm.SessionManager) http.HandlerFunc {
 // @Description  HandleEvent endpoint
 // @Accept       json
 // @Produce      json
+// @Param        id path string true "id of the client"
+// @Param        model.FrontendEvent body model.FrontendEvent true "comment"
 // @Success      200 {object} model.EventResponse true
 // @Failure      400 {object} model.ErrorResponse true
 // @Failure      404 {object} model.ErrorResponse true
@@ -171,6 +187,8 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 				return
 
 			case model.EditResource:
+				fmt.Println("Editing resource")
+
 				err := pCtx.Update(e)
 				if err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
@@ -202,21 +220,6 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 			case model.IsolatorChanged:
 
 				if err := pCtx.ResourceChanged(e); err != nil {
-					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
-					return
-				}
-
-				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
-				return
-
-			case model.ViewLongRunning:
-				result := pCtx.GetLongRunning(e)
-
-				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: result})
-				return
-
-			case model.DeleteLongRunning:
-				if err := pCtx.RemoveLongRunning(e.ResourceName); err != nil {
 					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
 					return
 				}
@@ -262,6 +265,23 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 			}
 		case model.SpecificAction:
 
+			if req.ActionName == string(model.DeleteLongRunning) {
+				if err := pCtx.RemoveLongRunning(e.ResourceName); err != nil {
+					_ = utils.SendErrorResponse(ctx, w, http.StatusBadRequest, err)
+					return
+				}
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{})
+				return
+			}
+
+			if req.ActionName == string(model.ViewLongRunning) {
+				result := pCtx.GetLongRunning(e)
+
+				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: result})
+				return
+			}
+
 			if req.ActionName == string(model.SpecificActionResolveArgs) {
 				res, err := pCtx.ExecuteSpecificActionTemplateArgs(e)
 				if err != nil {
@@ -270,7 +290,7 @@ func HandleEvent(sm *pm.SessionManager) http.HandlerFunc {
 				}
 
 				_ = utils.SendResponse(ctx, w, http.StatusOK, &model.EventResponse{Result: res})
-
+				return
 			}
 
 			actions, err := pCtx.GetSpecficActionList(e)
@@ -337,6 +357,8 @@ func HandleWebsocket(sm *pm.SessionManager) http.HandlerFunc {
 			conn.WriteMessage(websocket.CloseMessage, data)
 			return
 		}
+
+		sm.SetWSConn(ID, conn)
 
 		go func() {
 			_, _, err := conn.ReadMessage()

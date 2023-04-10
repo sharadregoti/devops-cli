@@ -15,7 +15,7 @@ import (
 
 // Server is the object which sets up the server and handles all server operations
 type Server struct {
-	sm     *pm.SessionManager
+	Sm     *pm.SessionManager
 	config *model.Config
 }
 
@@ -26,7 +26,7 @@ func New(conf *model.Config) (*Server, error) {
 	}
 
 	return &Server{
-		sm:     sm,
+		Sm:     sm,
 		config: conf,
 	}, nil
 }
@@ -40,16 +40,19 @@ func (s *Server) routes() http.Handler {
 	router := mux.NewRouter()
 
 	router.Methods(http.MethodGet).Path("/v1/config").HandlerFunc(handlers.HandleConfig(s.config))
-	router.Methods(http.MethodGet).Path("/v1/auth/{pluginName}").HandlerFunc(handlers.HandleAuth(s.sm))
-	router.Methods(http.MethodGet).Path("/v1/connect/{pluginName}/{authId}/{contextId}").HandlerFunc(handlers.HandleInfo(s.sm))
-	router.Methods(http.MethodPost).Path("/v1/events/{id}").HandlerFunc(handlers.HandleEvent(s.sm))
-	router.Methods(http.MethodGet).Path("/v1/ws/{id}").HandlerFunc(handlers.HandleWebsocket(s.sm))
-	router.Methods(http.MethodGet).Path("/v1/ws/action/{clientId}/{id}").HandlerFunc(handlers.HandleActionWebsocket(s.sm))
+	router.Methods(http.MethodGet).Path("/v1/auth/{pluginName}").HandlerFunc(handlers.HandleAuth(s.Sm))
+	// https://github.com/gorilla/mux/issues/77#issuecomment-522849160
+	router.Methods(http.MethodGet).Path("/v1/connect/{pluginName}/{authId}/{contextId:.+}").HandlerFunc(handlers.HandleInfo(s.Sm))
+	router.Methods(http.MethodPost).Path("/v1/events/{id}").HandlerFunc(handlers.HandleEvent(s.Sm))
+	router.Methods(http.MethodGet).Path("/v1/ws/{id}").HandlerFunc(handlers.HandleWebsocket(s.Sm))
+	router.Methods(http.MethodGet).Path("/v1/ws/action/{clientId}/{id}").HandlerFunc(handlers.HandleActionWebsocket(s.Sm))
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir(model.InitCoreDirectory() + "/dist")))
 
 	return router
 }
 
 func (s *Server) Start() error {
 	fmt.Println("Starting server on port:", s.config.Server.Address)
+	fmt.Printf("You can visit the app at : http://%s\n", s.config.Server.Address)
 	return http.ListenAndServe(s.config.Server.Address, utils.CreateCorsObject().Handler(middleware.LoggingHandler(logger.GetFileWriter(), s.routes())))
 }

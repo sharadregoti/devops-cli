@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/google/uuid"
@@ -107,15 +106,15 @@ func (c *CurrentPluginContext) PerformSavedAction(id string, rw io.ReadWriter) e
 
 	logger.LogDebug("Performing specific action: %v", fnArgs)
 
-	res, err := c.plugin.PerformSpecificAction(fnArgs)
-	if err != nil {
-		return err
-	}
+	// res, err := c.plugin.PerformSpecificAction(fnArgs)
+	// if err != nil {
+	// 	return err
+	// }
 
-	cmd := res.Result.AsInterface().(string)
-	logger.LogDebug("Performing specific action got result: %v", cmd)
+	// cmd := res.Result.AsInterface().(string)
+	logger.LogDebug("Performing specific action got result: %v", a.cmd)
 
-	if err := cmdExec(cmd, rw); err != nil {
+	if err := cmdExec(a.cmd, rw); err != nil {
 		return err
 	}
 
@@ -124,9 +123,33 @@ func (c *CurrentPluginContext) PerformSavedAction(id string, rw io.ReadWriter) e
 
 func cmdExec(cmdStr string, wr io.ReadWriter) error {
 	// Create arbitrary command.
-	arr := strings.Split(cmdStr, " ")
 
-	c := exec.Command(arr[0], arr[1:]...)
+	// arr := strings.Split(cmdStr, " ")
+	// create a temporary file
+	f, err := ioutil.TempFile("", "script")
+	if err != nil {
+		// handle error
+		return logger.LogError("failed to create temp file: Error ", err)
+	}
+	defer os.Remove(f.Name()) // delete the file when we're done
+
+	// write the script to the file
+	_, err = f.WriteString(cmdStr)
+	if err != nil {
+		// handle error
+		f.Close()
+		return logger.LogError("failed to write data in temp file: Error ", err)
+	}
+	f.Close()
+
+	// make the file executable
+	err = os.Chmod(f.Name(), 0777)
+	if err != nil {
+		// handle error
+		return logger.LogError("failed to make the temp file executable: Error ", err)
+	}
+
+	c := exec.Command(f.Name())
 
 	// Start the command with a pty.
 	ptmx, err := pty.Start(c)
@@ -166,10 +189,10 @@ func cmdExec(cmdStr string, wr io.ReadWriter) error {
 	return nil
 }
 
-func (c *CurrentPluginContext) saveAction(e model.Event) (*model.EventResponse, error) {
+func (c *CurrentPluginContext) saveAction(cmd string, e model.Event) (*model.EventResponse, error) {
 	id := uuid.NewString()
 	logger.LogDebug("Saving action (%s) againts id (%s)", e.Type, id)
-	c.actionsToExecute[id] = &actionsToExecute{e: e}
+	c.actionsToExecute[id] = &actionsToExecute{e: e, cmd: cmd}
 	return &model.EventResponse{ID: id}, nil
 }
 func (c *CurrentPluginContext) ExecuteSpecificActionTemplate(a *proto.Action, e model.Event) (string, error) {
@@ -305,7 +328,7 @@ func (c *CurrentPluginContext) SpecificAction(a *proto.Action, e model.Event) (*
 		// 	return nil, err
 		// }
 		// TODO: remove action after some time
-		saRes, err := c.saveAction(e)
+		saRes, err := c.saveAction(result.(string), e)
 		if err != nil {
 			return nil, err
 		}
@@ -352,7 +375,7 @@ func (c *CurrentPluginContext) NewLongRunning(cmdStr string, e *model.Event) err
 
 	// Execute the command
 	cmd := exec.Command(f.Name())
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	lri.SetCMD(cmd)
 	if err := cmd.Start(); err != nil {
 		return logger.LogError("Error while running command: %s", err)

@@ -32,6 +32,7 @@ type SpecficEvent string
 type OutputType string
 
 const (
+	OutputTypeEvent        string = "event"
 	OutputTypeString       string = "string"
 	OutputTypeNothing      string = "nothing"
 	OutputTypeStream       string = "stream"
