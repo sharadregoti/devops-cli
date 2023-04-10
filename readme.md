@@ -12,7 +12,7 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 - Improve debugging
 - Improve development agility
 
-## [Watch Demo](https://youtu.be/lynrs5ivoYw)
+## [Watch Web App Demo](https://youtu.be/DtQnuSDmodg)
 
 ## Installation
 **Linux & Mac**
