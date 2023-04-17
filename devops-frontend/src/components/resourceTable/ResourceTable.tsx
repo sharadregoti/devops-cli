@@ -78,6 +78,14 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
     // Make a websocket connection
     const ws = new WebSocket(websocketURL)
 
+    ws.onclose = () => {
+      console.log("Websocket connection closed");
+    }
+
+    ws.onerror = (e) => {
+      console.log("Websocket connection error", e);
+    }
+
     ws.onopen = () => {
       console.log("Websocket connection established");
     }
@@ -123,6 +131,10 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
       // setDataSource([...dataSource, obj]);
     });
 
+    return () => {
+      console.log("!!!!!!!!! Closing websocket connection !!!!!!!!");
+      ws.close()
+    }
   }, [websocketURL])
 
   const calculateDataSource = (message: WebsocketData, currentRows, objKey) => {

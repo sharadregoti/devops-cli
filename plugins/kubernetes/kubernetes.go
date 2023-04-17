@@ -181,6 +181,19 @@ func New(logger hclog.Logger) (*Kubernetes, error) {
 				namespaces = append(namespaces, ctx.Namespace)
 			}
 
+			for i, localConfigCtx := range kc.Contexts {
+				isAllFound := false
+				for _, n := range localConfigCtx.DefaultNamespacesToShow {
+					if n == "all" {
+						isAllFound = true
+					}
+				}
+
+				if !isAllFound {
+					kc.Contexts[i].DefaultNamespacesToShow = append(kc.Contexts[i].DefaultNamespacesToShow, "all")
+				}
+			}
+
 			if !isContextFound {
 				res.KubeConfigs[i].Contexts = append(res.KubeConfigs[i].Contexts, &Contexts{
 					Name:                    k,

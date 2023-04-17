@@ -43,6 +43,10 @@ func (s *SessionManager) DeleteClient(ID string) {
 
 func (s *SessionManager) SetWSConn(ID string, conn *websocket.Conn) {
 	info := s.m[ID]
+	if info.c.wsConn != nil {
+		logger.LogInfo("Closing old websocket connection")
+		info.c.wsConn.Close()
+	}
 	info.c.wsConn = conn
 }
 

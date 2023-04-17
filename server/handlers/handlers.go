@@ -363,7 +363,11 @@ func HandleWebsocket(sm *pm.SessionManager) http.HandlerFunc {
 		go func() {
 			_, _, err := conn.ReadMessage()
 			if err != nil {
-				sm.DeleteClient(ID)
+				logger.LogError("Error reading message from websocket %v", err)
+				// sm.DeleteClient(ID)
+				// data, _ := json.Marshal(model.ErrorResponse{Message: err.Error()})
+				// conn.WriteMessage(websocket.CloseMessage, data)
+				// return
 			}
 		}()
 

@@ -2,8 +2,8 @@ import { Configuration, DefaultApi, ModelConfig, HandleAuthRequest, HandleInfoRe
 
 // http://localhost:9753
 // For Prod
-export const apiHost = window.location.host;
-// export const apiHost = "localhost:9753";
+// export const apiHost = window.location.host;
+export const apiHost = "localhost:9753";
 export const httpAPI = `http://${apiHost}`;
 
 const configuration = new Configuration({
