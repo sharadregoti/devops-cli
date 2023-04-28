@@ -34,14 +34,14 @@ tar -czvf ui.tar.gz dist/
 # Build Core Binary
 echo "Building core binary..."
 cd ../
-goreleaser release --rm-dist --skip-validate
+goreleaser release --clean --skip-validate --snapshot
 
 # Build kubernetes plugins
 cd plugins/kubernetes
-goreleaser release --rm-dist --skip-validate
+goreleaser release --clean --skip-validate
 
 cd ../
 
 # Build kubernetes plugins
 cd helm
-goreleaser release --rm-dist --skip-validate
+goreleaser release --clean --skip-validate

@@ -27,6 +27,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Setup Nodejs and npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+          
+      - name: Setup yarn, vite
+        run: |
+          npm install -g yarn
+          npm install -g vite
+
       - uses: ypicard/get-branch-name-github-action@v1
         id: current-branch
 
@@ -37,10 +47,10 @@ jobs:
           # curl -sfL https://goreleaser.com/static/run | bash
           go install github.com/goreleaser/goreleaser@latest
           
-          echo "Creating tag..."
-          git config --global user.email "sharadregoti15@gmail.com"
-          git config --global user.name "sharadregoti"
-          git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
-          
+          # echo "Creating tag..."
+          # git config --global user.email "sharadregoti15@gmail.com"
+          # git config --global user.name "sharadregoti"
+          # git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+
           echo "Running script..."
           bash release.sh
