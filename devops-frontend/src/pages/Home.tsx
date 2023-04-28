@@ -941,7 +941,7 @@ const Home: React.FC = () => {
               {/*  */}
               {
                 !hideSearchBar &&
-                <Row style={{ position: 'fixed', bottom: 0, left: 80, right: 20 }} >
+                <Row style={{ position: 'fixed', bottom: 5, left: 80, right: 20 }} >
                   <Col span={24} style={{ "margin": "0px 8px" }}>
                     {appConfig && appConfig.generalInfo &&
                       <AutoComplete

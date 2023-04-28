@@ -41,7 +41,7 @@ const IsolatorCard: React.FC<InfoCardPropsTypes> = ({ currentIsolator, defaultIs
             }, '')
             : '';
 
-        const selectWidth = getTextWidth(longestIsolatorName, '16px Arial'); // 50px extra for padding and dropdown arrow
+        const selectWidth = getTextWidth(longestIsolatorName, '16px Arial') + 50; // 50px extra for padding and dropdown arrow
         setSelectWidth(selectWidth);
     }, [isolators])
 
