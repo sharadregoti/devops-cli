@@ -1,28 +1,28 @@
 #!/bin/bash
 
-echo "Did you uncomment the production URL (y/n)?"
-read answer
+# echo "Did you uncomment the production URL (y/n)?"
+# read answer
 
-if [ "$answer" != "${answer#[Nn]}" ] ;then
-    echo "Exitting..."
-    exit 0
-fi
+# if [ "$answer" != "${answer#[Nn]}" ] ;then
+#     echo "Exitting..."
+#     exit 0
+# fi
 
-echo "Did increment version number in code (y/n)?"
-read answer
+# echo "Did increment version number in code (y/n)?"
+# read answer
 
-if [ "$answer" != "${answer#[Nn]}" ] ;then
-    echo "Exitting..."
-    exit 0
-fi
+# if [ "$answer" != "${answer#[Nn]}" ] ;then
+#     echo "Exitting..."
+#     exit 0
+# fi
 
-echo "Did create a new git tag as per current version number (y/n)?"
-read answer
+# echo "Did create a new git tag as per current version number (y/n)?"
+# read answer
 
-if [ "$answer" != "${answer#[Nn]}" ] ;then
-    echo "Exitting..."
-    exit 0
-fi
+# if [ "$answer" != "${answer#[Nn]}" ] ;then
+#     echo "Exitting..."
+#     exit 0
+# fi
 
 cd devops-frontend
 # Build frontend

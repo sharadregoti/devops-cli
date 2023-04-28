@@ -46,3 +46,4 @@ blobs:
       - devops-core
     extra_files:
       - glob: ./install.sh
+      - glob: devops-frontend/ui.tar.gz

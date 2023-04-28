@@ -1,0 +1,37 @@
+name: Go
+on:
+  pull_request:
+    branches:
+      - v*
+jobs:
+  v2:
+    name: "Version Relase"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup stage golang environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: stable
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Cache Go Modules
+        uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - uses: ypicard/get-branch-name-github-action@v1
+        id: current-branch
+
+      - name: Lint
+        run: |
+          # Download Go Releaser
+          echo "Current branch is ${{ steps.current-branch.outputs.branch}}"
+          curl -sfL https://goreleaser.com/static/run | bash
+          git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+          bash release.sh
