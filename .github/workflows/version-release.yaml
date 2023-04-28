@@ -36,7 +36,11 @@ jobs:
           echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
           # curl -sfL https://goreleaser.com/static/run | bash
           go install github.com/goreleaser/goreleaser@latest
+          
           echo "Creating tag..."
+          git config --global user.email "sharadregoti15@gmail.com"
+          git config --global user.name "sharadregoti"
           git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+          
           echo "Running script..."
           bash release.sh
