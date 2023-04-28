@@ -24,6 +24,7 @@
 #     exit 0
 # fi
 
+echo "Building frontend..."
 cd devops-frontend
 # Build frontend
 vite build
@@ -31,6 +32,7 @@ vite build
 tar -czvf ui.tar.gz dist/
 
 # Build Core Binary
+echo "Building core binary..."
 cd ../
 goreleaser release --rm-dist --skip-validate
 

@@ -30,10 +30,13 @@ jobs:
       - uses: ypicard/get-branch-name-github-action@v1
         id: current-branch
 
-      - name: Lint
+      - name: Run Build and Release script
         run: |
           # Download Go Releaser
-          echo "Current branch is ${{ steps.current-branch.outputs.branch}}"
-          curl -sfL https://goreleaser.com/static/run | bash
+          echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
+          # curl -sfL https://goreleaser.com/static/run | bash
+          go install github.com/goreleaser/goreleaser@latest
+          echo "Creating tag..."
           git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+          echo "Running script..."
           bash release.sh
