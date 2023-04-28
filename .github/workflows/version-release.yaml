@@ -31,10 +31,13 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: "16"
-          
-      - name: Setup yarn, vite
+
+      - name: Setup yarn
         run: |
           npm install -g yarn
+
+      - name: Setup vite
+        run: |
           npm install -g vite
 
       - uses: ypicard/get-branch-name-github-action@v1
@@ -46,7 +49,7 @@ jobs:
           echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
           # curl -sfL https://goreleaser.com/static/run | bash
           go install github.com/goreleaser/goreleaser@latest
-          
+
           # echo "Creating tag..."
           # git config --global user.email "sharadregoti15@gmail.com"
           # git config --global user.name "sharadregoti"
