@@ -30,7 +30,8 @@ const InfoCard: React.FC<InfoCardPropsTypes> = ({ title, content }) => {
           Object.entries(content).map(([key, value]: [string, string]) => (
             // Object.entries(content).slice(0, 4).map(([key, value]: [string, string]) => (
             <span style={keyValueStyle} key={key} title={`${key}: ${value}`}>
-              {key}: {value}
+              {/* {key}: {value} */}
+              {value}
             </span>
           ))}
       </Card>

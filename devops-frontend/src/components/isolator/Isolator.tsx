@@ -55,8 +55,10 @@ const IsolatorCard: React.FC<InfoCardPropsTypes> = ({ currentIsolator, defaultIs
                     <Select
                         defaultValue={defaultIsolator}
                         showSearch
+                        value={currentIsolator}
                         style={{ width: selectWidth, margin: "5px" }}
                         onChange={(value: string) => onNamespaceChange(value)}
+                        filterSort={(optionA, optionB) => optionA.value.localeCompare(optionB.value)}
                         options={isolators.map((val) => {
                             return { "value": val, "label": val }
                         })}

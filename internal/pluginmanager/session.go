@@ -77,7 +77,7 @@ func (s *SessionManager) AddClient(ID, pluginName, authID, contextID string) err
 			return err
 		}
 
-		dataPipe := make(chan model.WebsocketResponse, 10)
+		dataPipe := make(chan model.WebsocketResponse, 1)
 		pCtx.SetDataPipe(dataPipe)
 
 		s.m[ID] = &sessionInfo{

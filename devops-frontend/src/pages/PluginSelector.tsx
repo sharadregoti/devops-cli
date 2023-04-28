@@ -38,12 +38,16 @@ const PluginSelector: React.FC = () => {
             title: 'Name',
             dataIndex: 'name',
             key: 'name',
+            sorter: (a: TableDataType, b: TableDataType) => a.name.localeCompare(b.name),
+            defaultSortOrder: 'ascend',
             // render: (text) => <a>{text}</a>,
         },
         {
             title: 'Context',
             dataIndex: 'context',
             key: 'context',
+            sorter: (a: TableDataType, b: TableDataType) => a.context.localeCompare(b.context),
+            defaultSortOrder: 'ascend',
             render: (text) => <a>{text}</a>,
         },
         {

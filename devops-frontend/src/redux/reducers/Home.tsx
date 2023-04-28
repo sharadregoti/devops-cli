@@ -7,12 +7,12 @@ import { AppState } from "../../types/Event";
 
 export type HomeState = {
     home: Record<string, {
-        drecentlyUsedItems: string[],
-        disolatorsList: string[],
-        dappConfig: AppState,
-        ddrawerState: DrawerPropsTypes,
-        dspecificActionFormState: SpecificActionFormProps,
-        disolatorCardState: InfoCardPropsTypes
+        recentlyUsedItems: string[],
+        isolatorsList: string[],
+        appConfig: AppState,
+        drawerState: DrawerPropsTypes,
+        specificActionFormState: SpecificActionFormProps,
+        isolatorCardState: InfoCardPropsTypes
     }>;
 };
 
@@ -21,18 +21,35 @@ export const homeReducer = (
     action: { type: string; payload: any; key: string }
 ) => {
     switch (action.type) {
+        case 'ADD_ISOLATOR': {
+            const { key, isolatorName } = action;
+            const currentIsolatorsList = state[key]?.isolatorsList || [];
+
+            // Check if isolatorName already exists in the currentIsolatorsList
+            if (currentIsolatorsList.includes(isolatorName)) {
+                return state; // Return the unchanged state if the isolator already exists
+            }
+
+            return {
+                ...state,
+                [key]: {
+                    ...state[key],
+                    isolatorsList: [...currentIsolatorsList, isolatorName],
+                },
+            };
+        }
         case 'SET_HOME_STATE':
             return {
                 ...state,
                 [action.key]: {
                     ...(state[action.key] || {
-                        drecentlyUsedItems: [],
-                        disolatorsList: [],
-                        ddrawerState: {},
-                        dspecificActionFormState: {
+                        recentlyUsedItems: [],
+                        isolatorsList: [],
+                        drawerState: {},
+                        specificActionFormState: {
                             formItems: {},
                         } as SpecificActionFormProps,
-                        disolatorCardState: {} as InfoCardPropsTypes,
+                        isolatorCardState: {} as InfoCardPropsTypes,
                     }),
                     ...action.payload,
                 },

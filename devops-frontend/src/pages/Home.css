@@ -1,5 +1,5 @@
 .resource-table-container {
-  height: calc(100vh - 200px);
+  height: calc(100vh - 230px);
   /* Adjust the value 200px to the actual height of your header, footer, and other components */
   overflow-y: auto;
 }
