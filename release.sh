@@ -34,7 +34,7 @@ tar -czvf ui.tar.gz dist/
 # Build Core Binary
 echo "Building core binary..."
 cd ../
-goreleaser release --clean --skip-validate --snapshot
+goreleaser release --clean --skip-validate
 
 # Build kubernetes plugins
 cd plugins/kubernetes

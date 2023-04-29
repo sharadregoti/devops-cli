@@ -32,13 +32,17 @@ jobs:
         with:
           node-version: "16"
 
-      - name: Setup yarn
-        run: |
-          npm install -g yarn
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
-      - name: Setup vite
+      - name: Run Vite build
+        run: yarn build
+
+      - name: Install goreleaser
         run: |
-          npm install -g vite
+          wget -q https://github.com/goreleaser/goreleaser/releases/download/v1.17.2/goreleaser_Linux_x86_64.tar.gz
+          tar -xzf goreleaser_Linux_x86_64.tar.gz
+          sudo mv goreleaser /usr/local/bin/
 
       - uses: ypicard/get-branch-name-github-action@v1
         id: current-branch
@@ -47,13 +51,11 @@ jobs:
         run: |
           # Download Go Releaser
           echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
-          # curl -sfL https://goreleaser.com/static/run | bash
-          go install github.com/goreleaser/goreleaser@latest
 
           # echo "Creating tag..."
-          # git config --global user.email "sharadregoti15@gmail.com"
-          # git config --global user.name "sharadregoti"
-          # git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+          git config --global user.email "sharadregoti15@gmail.com"
+          git config --global user.name "sharadregoti"
+          git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
 
           echo "Running script..."
           bash release.sh
