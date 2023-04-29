@@ -47,6 +47,11 @@ jobs:
       - uses: ypicard/get-branch-name-github-action@v1
         id: current-branch
 
+      - name: Set up Google Application Credentials
+        run: |
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}' > credentials.json
+          echo 'GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/credentials.json' >> $GITHUB_ENV
+
       - name: Run Build and Release script
         run: |
           # Download Go Releaser
