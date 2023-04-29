@@ -55,9 +55,8 @@ jobs:
           # echo "Creating tag..."
           git config --global user.email "sharadregoti15@gmail.com"
           git config --global user.name "sharadregoti"
-          git fetch origin ${{ steps.current-branch.outputs.branch}}:${{ steps.current-branch.outputs.branch}}
-          git checkout ${{ steps.current-branch.outputs.branch }}
-          git checkout -b "temp-branch"
+          git remote set-url origin "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git fetch --depth=1 origin "+refs/heads/*:refs/remotes/origin/*"
           git checkout $GITHUB_SHA
           git tag -a "${{ steps.current-branch.outputs.branch}}" -m "dummy tag"
 
