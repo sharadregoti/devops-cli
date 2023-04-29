@@ -27,7 +27,7 @@
 echo "Building frontend..."
 cd devops-frontend
 # Build frontend
-vite build
+yarn build
 # Create tar file
 tar -czvf ui.tar.gz dist/
 
