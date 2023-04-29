@@ -59,7 +59,7 @@ jobs:
           git checkout ${{ steps.current-branch.outputs.branch}}
           git checkout -b "temp-branch"
           TIMESTAMP=$(date +%s)
-          git tag -a "temp-tag-$TIMESTAMP" -m "dummy tag"
+          git tag -a "${{ steps.current-branch.outputs.branch}}" -m "dummy tag"
           echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
 
           echo "Running script..."
