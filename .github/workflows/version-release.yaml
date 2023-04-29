@@ -55,6 +55,7 @@ jobs:
           # echo "Creating tag..."
           git config --global user.email "sharadregoti15@gmail.com"
           git config --global user.name "sharadregoti"
+          git checkout -b "temp-branch"
           git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
 
           echo "Running script..."
