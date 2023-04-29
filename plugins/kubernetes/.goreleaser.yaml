@@ -3,6 +3,8 @@ before:
     - go mod tidy
 builds:
   - id: devops-kubernetes-plugin
+    env:
+      - CGO_ENABLED=0  
     flags:
     - -tags=release
     # - -o kubernetes

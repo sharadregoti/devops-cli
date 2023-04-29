@@ -25,16 +25,17 @@ export type ResourceTablePropsType = {
   // specificActions: Array<string>,
   pluginName: string
   websocketURL: string,
-  isCurrentResourceAnIsolator: boolean,
+  defaultIsolatorResourceType: string,
   customTable: CustomTable
   internalTable: InternalTable,
+  handleCloseGlobalLoading: () => void,
   onEvent: (e: ModelFrontendEvent) => void,
   handleIsolator: (isolatorName: string) => void,
   handleTableRowClick: (record: any) => void,
   handleResourceSpecificAction: (sas: Array<SpecificAction>) => void,
 }
 
-const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolator, handleTableRowClick, handleResourceSpecificAction, isCurrentResourceAnIsolator, pluginName, websocketURL, customTable, internalTable }) => {
+const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleCloseGlobalLoading, handleIsolator, handleTableRowClick, handleResourceSpecificAction, defaultIsolatorResourceType, pluginName, websocketURL, customTable, internalTable }) => {
 
   let count = 0;
   let wsTableName = "";
@@ -71,6 +72,49 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
     }
   }, [customTable])
 
+  const BATCH_SIZE = 500;
+  const PROCESSING_INTERVAL = 500; // 500ms
+  let messageBatch = [];
+  let messageBuffer = [];
+  let batchProcessingTimeout;
+  let isProcessingBatch = false;
+
+  const processMessageBatch = () => {
+    if (messageBatch.length === 0) return;
+
+    isProcessingBatch = true;
+    const batchToProcess = messageBatch;
+    messageBatch = messageBuffer;
+    messageBuffer = [];
+
+    setDataRows(currentDataRows => {
+      if (currentDataRows === undefined) {
+        console.log("Current data rows is undefined", idataRows.length);
+        return idataRows
+      }
+
+      let newRows = [...currentDataRows];
+
+      batchToProcess.forEach((message, index) => {
+        count++;
+        const resultObj = calculateDataSource(message, newRows, count);
+        // if (message.name === generalInfo.isolatorType) {
+        //   setIsolatorsList(isolatorsList => [...isolatorsList, resultObj.obj["1"]]);
+        // }
+        if (defaultIsolatorResourceType === message.name) {
+          console.log("Isolator type is", message.name, "and current resource is an isolator");
+          handleIsolator(resultObj.obj["1"]);
+        }
+        newRows = resultObj?.row;
+      });
+
+      return newRows;
+    });
+
+    // messageBatch = [];
+    isProcessingBatch = false;
+  };
+
   useEffect(() => {
     if (websocketURL === "") {
       return
@@ -78,12 +122,42 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
     // Make a websocket connection
     const ws = new WebSocket(websocketURL)
 
+    ws.onclose = () => {
+      console.log("Websocket connection closed");
+    }
+
+    ws.onerror = (e) => {
+      console.log("Websocket connection error", e);
+    }
+
     ws.onopen = () => {
       console.log("Websocket connection established");
+      handleCloseGlobalLoading()
     }
 
     ws.onmessage = (e => {
       const message: WebsocketData = JSON.parse(e.data);
+      // New Code
+
+      if (isProcessingBatch) {
+        messageBuffer.push(message);
+      } else {
+        messageBatch.push(message);
+      }
+
+      if (messageBatch.length >= BATCH_SIZE) {
+        clearTimeout(batchProcessingTimeout);
+        // console.log("Batch size reached");
+        processMessageBatch();
+      } else {
+        clearTimeout(batchProcessingTimeout);
+        batchProcessingTimeout = setTimeout(() => {
+          // console.log("Time out process invoked");
+          processMessageBatch();
+        }, PROCESSING_INTERVAL);
+      }
+
+      // Old Code
       const headerRowData = message.data[0].data;
 
       const columns = headerRowData.map((title, index) => ({
@@ -104,25 +178,12 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
 
 
       setHeaderRow(columns)
-      setDataRows(currentDataRows => {
-        if (currentDataRows === undefined) {
-          console.log("Current data rows is undefined", idataRows.length);
-          return idataRows
-        }
-        count++
-        const resultObj = calculateDataSource(message, currentDataRows, count);
-        // if (message.name === generalInfo.isolatorType) {
-        if (isCurrentResourceAnIsolator) {
-          handleIsolator(resultObj.obj["1"]);
-        }
-        return resultObj?.row
-
-      });
-
-      // count++;
-      // setDataSource([...dataSource, obj]);
     });
 
+    return () => {
+      console.log("!!!!!!!!! Closing websocket connection !!!!!!!!");
+      ws.close()
+    }
   }, [websocketURL])
 
   const calculateDataSource = (message: WebsocketData, currentRows, objKey) => {
@@ -223,7 +284,7 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
                   />
                 </Col>
 
-                {isCurrentResourceAnIsolator &&
+                {wsTableName === defaultIsolatorResourceType &&
                   <Col>
                     <FileAddOutlined
                       style={{ color: "gray" }}
@@ -362,7 +423,7 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
         title={() => (
           <center>
             <Typography.Title style={{ margin: "8px" }} level={5}>
-              {itableName.charAt(0).toUpperCase() + itableName.slice(1)}
+              {itableName.charAt(0).toUpperCase() + itableName.slice(1)} ({idataRows.length})
             </Typography.Title>
           </center>
         )}
@@ -390,9 +451,10 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleIsolat
           };
         }}
         // scroll={{ y: 1000 }}
-        pagination={{
-          pageSize: 100,
-        }}
+        pagination={false}
+        // pagination={{
+        //   pageSize: 100,
+        // }}
         columns={[...iheaderRow, columnActions]}
         dataSource={idataRows}
         // rowClassName={(record, index) => record["color"] === "" ? "white" : record["color"]}

@@ -3,8 +3,10 @@ before:
     - go mod tidy
 builds:
   - id: devops-helm-plugin
+    env:
+      - CGO_ENABLED=0
     flags:
-    - -tags=release
+      - -tags=release
     # - -o helm
     main: .
     binary: helm
@@ -18,7 +20,7 @@ release:
 
 archives:
   - builds:
-    - devops-helm-plugin
+      - devops-helm-plugin
     id: devops-helm-plugin
     name_template: "devops-helm-plugin_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
@@ -33,19 +35,19 @@ archives:
       386: i386
       amd64: x86_64
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - "^docs:"
+      - "^test:"
 
 blobs:
   - provider: gs
     bucket: devops-cli-artifacts
     folder: "releases/devops/{{.Version}}"
     ids:
-    - devops-helm-plugin
+      - devops-helm-plugin

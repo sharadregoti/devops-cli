@@ -12,12 +12,13 @@ This project is inspired from the following softwares terraform, K9s, Lens.
 - Improve debugging
 - Improve development agility
 
-## [Watch Web App Demo](https://youtu.be/DtQnuSDmodg)
+## [Watch Web App Demo 1](https://youtu.be/DtQnuSDmodg)
+## [Watch Web App Demo 2 (new ux)](https://youtu.be/0nEwPfzeikQ)
 
 ## Installation
 **Linux & Mac**
 
-`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.5.0/install.sh | bash`
+`curl https://storage.googleapis.com/devops-cli-artifacts/releases/devops/0.5.1/install.sh | bash`
 
 ## Usage
 

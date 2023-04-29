@@ -167,6 +167,9 @@ downloadFile() {
     SPACE_CLI_ARTIFACT="devops-helm-plugin_${LATEST_RELEASE_TAG}_${OS}_${ARCH}.tar.gz"
     DOWNLOAD_URL="${DOWNLOAD_BASE}/ui.tar.gz"
 
+    echo "Remove Old UI"
+    rm -rf $HOME/.devops/dist $HOME/.devops/ui.tar.gz
+
     echo "Downloading UI"
 
     wget -O "$HOME/.devops/ui.tar.gz" "${DOWNLOAD_URL}"

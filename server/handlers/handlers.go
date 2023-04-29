@@ -341,15 +341,17 @@ func HandleWebsocket(sm *pm.SessionManager) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		conn.SetCloseHandler(func(code int, text string) error {
-			logger.LogInfo("Websocket connection closed with code (%v) text (%v)", code, text)
-			return err
-		})
-
 		params := mux.Vars(r)
 		ID := params["id"]
 		// authID := params["authId"]
 		// contextID := params["contextId"]
+
+		writerCloserCh := make(chan struct{}, 1)
+		conn.SetCloseHandler(func(code int, text string) error {
+			logger.LogInfo("Websocket connection id (%v) closed with code (%v) text (%v)", ID, code, text)
+			writerCloserCh <- struct{}{}
+			return err
+		})
 
 		pCtx, err := sm.GetClient(ID)
 		if err != nil {
@@ -361,16 +363,30 @@ func HandleWebsocket(sm *pm.SessionManager) http.HandlerFunc {
 		sm.SetWSConn(ID, conn)
 
 		go func() {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				sm.DeleteClient(ID)
+			for {
+				select {
+				case <-writerCloserCh:
+					logger.LogInfo("Websocket writer connection id (%v) closed", ID)
+					return
+				case v := <-pCtx.GetDataPipe():
+					if err = conn.WriteJSON(v); err != nil {
+						logger.LogError("Error writing message to websocket %v", err)
+						data, _ := json.Marshal(model.ErrorResponse{Message: err.Error()})
+						conn.WriteMessage(websocket.CloseMessage, data)
+						return
+					}
+				}
 			}
+
 		}()
 
-		for v := range pCtx.GetDataPipe() {
-			if err = conn.WriteJSON(v); err != nil {
-				data, _ := json.Marshal(model.ErrorResponse{Message: err.Error()})
-				conn.WriteMessage(websocket.CloseMessage, data)
+		for {
+			_, _, err = conn.ReadMessage()
+			if err != nil {
+				logger.LogError("Error reading message from websocket %v", err)
+				// sm.DeleteClient(ID)
+				// data, _ := json.Marshal(model.ErrorResponse{Message: err.Error()})
+				// conn.WriteMessage(websocket.CloseMessage, data)
 				return
 			}
 		}

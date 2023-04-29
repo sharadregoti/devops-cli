@@ -17,9 +17,33 @@ export type InfoCardPropsTypes = {
 
 const IsolatorCard: React.FC<InfoCardPropsTypes> = ({ currentIsolator, defaultIsolator, isolators, frequentlyUsed, appConfig, onNamespaceChange }) => {
     const onChange = (e: RadioChangeEvent) => {
-        console.log("Namespace change 1", e.target.value);
         onNamespaceChange(e.target.value)
     };
+
+    const [selectWidth, setSelectWidth] = useState()
+
+    function getTextWidth(text, font) {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        context.font = font;
+        const metrics = context.measureText(text);
+        return metrics.width;
+    }
+
+    useEffect(() => {
+        if (isolators.length === 0) {
+            return
+        }
+
+        const longestIsolatorName = isolators
+            ? isolators.reduce((longest, isolator) => {
+                return isolator.length > longest.length ? isolator : longest;
+            }, '')
+            : '';
+
+        const selectWidth = getTextWidth(longestIsolatorName, '16px Arial') + 50; // 50px extra for padding and dropdown arrow
+        setSelectWidth(selectWidth);
+    }, [isolators])
 
     return (
         <>
@@ -31,13 +55,17 @@ const IsolatorCard: React.FC<InfoCardPropsTypes> = ({ currentIsolator, defaultIs
                     <Select
                         defaultValue={defaultIsolator}
                         showSearch
-                        style={{ width: "150px", margin: "5px" }}
+                        value={currentIsolator}
+                        style={{ width: selectWidth, margin: "5px" }}
                         onChange={(value: string) => onNamespaceChange(value)}
-                        options={isolators.map((val) => ({ "value": val, "label": val }))}
+                        filterSort={(optionA, optionB) => optionA.value.localeCompare(optionB.value)}
+                        options={isolators.map((val) => {
+                            return { "value": val, "label": val }
+                        })}
                     />
                 </Col>
             </Row>
-            <Row>
+            <Row style={{ width: selectWidth }}>
                 <Col flex={""} >
                     <Radio.Group onChange={onChange} value={currentIsolator}>
                         {/* <Space direction="vertical"> */}

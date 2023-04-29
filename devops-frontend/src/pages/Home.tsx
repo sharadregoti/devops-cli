@@ -1,44 +1,118 @@
-import { AutoComplete, Col, Modal, Row } from 'antd';
+import { AutoComplete, Col, Empty, Layout, Modal, Row, Spin } from 'antd';
+import { Content } from 'antd/es/layout/layout';
 import Fuse from 'fuse.js';
-import React, { useEffect, useRef, useState } from 'react';
+import yaml from "js-yaml";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import '../../node_modules/xterm/css/xterm.css';
+import SideDrawer, { DrawerPropsTypes } from '../components/drawer/Drawer';
 import InfoCard from '../components/infoCard/InfoCard';
 import IsolatorCard, { InfoCardPropsTypes } from '../components/isolator/Isolator';
+import RecentlyUsed from '../components/recentlyUsed/RecentlyUsed';
 import ResourceTable, { CustomTable, InternalTable } from '../components/resourceTable/ResourceTable';
+import SideNav from '../components/sideNav/SideNav';
+import SpecificActionForm, { SpecificActionFormProps } from '../components/specificActionForm/SpecificActionForm';
 import { HandleEventRequest, HandleInfoRequest, ModelConfig, ModelFrontendEvent, ModelFrontendEventNameEnum, ModelPlugin, ProtoAuthInfo } from "../generated-sources/openapi";
 import { AppState, SpecificAction } from '../types/Event';
 import { api, apiHost } from '../utils/config';
 import { showNotification } from '../utils/notification';
 import { getAuthenticationSetting, getPluginSetting, parseAuthenticationSetting, parsePluginSetting, settingAuthentication, settingPlugin } from '../utils/settings';
 import './Home.css';
-import yaml from "js-yaml";
-import SideDrawer, { DrawerPropsTypes } from '../components/drawer/Drawer';
-import SpecificActionForm, { SpecificActionFormProps } from '../components/specificActionForm/SpecificActionForm';
+import { useDispatch, useSelector } from 'react-redux';
+import { HomeState } from '../redux/reducers/Home';
+import { NavBarItem, NavBarState } from '../redux/reducers/PluginSelectorReducer';
+import { withSuccess } from 'antd/es/modal/confirm';
 
 const Home: React.FC = () => {
+  const { pluginName, authId, sessionId, contextId } = useParams();
+  const [globalPageLoading, setGlobalPageLoading] = useState(false);
 
-  const [drawerState, setDrawerState] = useState<DrawerPropsTypes>({} as DrawerPropsTypes)
+  const dispatch = useDispatch();
+  const {
+    recentlyUsedItems,
+    appConfig,
+    drawerState,
+    specificActionFormState,
+    isolatorCardState,
+    isolatorsList,
+  } = useSelector((state: HomeState) => state.home[sessionId] || {
+    recentlyUsedItems: [],
+    isolatorsList: [],
+    drawerState: {},
+    specificActionFormState: {
+      formItems: {},
+    } as SpecificActionFormProps,
+    isolatorCardState: {} as InfoCardPropsTypes,
+  });
 
-  const [specificActionFormState, setSpecificActionFormState] = useState<SpecificActionFormProps>({
-    formItems: {},
-  } as SpecificActionFormProps)
+  const { items } = useSelector((state: NavBarState) => state.navBar);
 
+  const navItem = items.find((item: NavBarItem) => item.sessionId === sessionId)
+  if (navItem === undefined) {
+    showNotification("error", "Error", "Session not found Or Page refresh not supported")
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Empty
+          // Convert the below description to multiline paragraph
+          description={<div>
+            <p>Session not found Or Page refresh not supported</p>
+            <p>
+              Navigate to{" "}
+              <a href={window.location.origin}>{window.location.origin}</a> to
+              select a plugin
+            </p>
+          </div>}
+          imageStyle={{ height: 60 }}
+        >
+        </Empty>
+      </div>
+    )
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = 'Page refresh not supported on this page.';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Clean up the event listener when the component is unmounted
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  // No use, Even if we add this in redux
+  // This cannot be added in redux, as we don't allow clicking outside (When a drawer or form opens up).
+  // So no way to switch plugins
+  // const [drawerState, setDrawerState] = useState<DrawerPropsTypes>(ddrawerState)
+  // const [specificActionFormState, setSpecificActionFormState] = useState<SpecificActionFormProps>(dspecificActionFormState)
+
+  // This is already convered in appConfig
   const [searchOptions, setSearchOptions] = useState([]);
-
-  const [currentSettings, setCurrentSettings] = useState<Array<string>>([])
-  const [appConfig, setAppConfig] = useState<AppState>({} as AppState);
-
+  // const [currentSettings, setCurrentSettings] = useState<Array<string>>([])
+  // DONE
+  // const [appConfig, setAppConfig] = useState<AppState>(dappConfig);
 
   // Resource table
   const [currentResourceSpecificActions, setCurrentResourceSpecificActions] = useState<Array<SpecificAction>>([]);
   const [customTable, setCustomTable] = useState<CustomTable>({} as CustomTable);
   const [websocketURL, setwebsocketURL] = useState("");
   const [internalTable, setInternalTable] = useState({} as InternalTable);
-
-  const [isolatorsList, setIsolatorsList] = useState<Array<string>>([])
-
+  // Done
+  // const [isolatorsList, setIsolatorsList] = useState<Array<string>>(disolatorsList)
   // Search bar
   const [hideSearchBar, setHideSearchBar] = useState(false);
+  // Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteModalMessage, setDeleteModalMessage] = useState("");
+  // DONE
+  // const [recentlyUsedItems, setRecentlyUsedItems] = useState(drecentlyUsedItems);
+
+  // const [isolatorCardState, setIsolatorCardState] = useState<InfoCardPropsTypes>(disolatorCardState)
+  const [tableRow, setTableRow] = useState()
+
 
   const authTablecolumns = ["ID", "NAME"].map((title, index) => ({
     title,
@@ -46,9 +120,6 @@ const Home: React.FC = () => {
     key: index,
   }));
 
-  // Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteModalMessage, setDeleteModalMessage] = useState("");
 
   const handleOnDeleteOkButtonClick = () => {
     const e: ModelFrontendEvent = {
@@ -81,10 +152,78 @@ const Home: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  const onSearch = (value: string) => {
+    const event: ModelFrontendEvent = {
+      eventType: "internal-action",
+      name: "resource-type-change",
+      isolatorName: appConfig?.currentIsolator,
+      pluginName: appConfig?.currentPluginName,
+      resourceName: "",
+      resourceType: value.toLowerCase(),
+      args: {},
+    }
+
+    handleOnResourceEvent(event)
+    setCustomTable({ dataRows: [], headerRow: [], tableName: value.toLowerCase() })
+    dispatch({
+      type: 'SET_HOME_STATE',
+      key: sessionId, // Add the sessionId as the key
+      payload: {
+        appConfig: { ...appConfig, currentResourceType: value.toLowerCase() },
+      }
+    })
+    // focusOnTable()
+    dispatch({
+      type: 'SET_HOME_STATE',
+      key: sessionId, // Add the sessionId as the key
+      payload: {
+        recentlyUsedItems: getRecentlyUsed(value),
+      }
+    })
+    // setRecentlyUsedItems((prevRecentlyUsedItems) => {
+    //   // If the selected item is already in the list, remove it so it can be added to the front
+    //   const updatedRecentlyUsedItems = prevRecentlyUsedItems.filter(
+    //     (item) => item !== value
+    //   );
+
+    //   // Add the selectedItem to the front of the array
+    //   updatedRecentlyUsedItems.unshift(value);
+
+    //   // Limit the length of the array to 5 items
+    //   if (updatedRecentlyUsedItems.length > 5) {
+    //     updatedRecentlyUsedItems.pop();
+    //   }
+
+    //   return updatedRecentlyUsedItems;
+    // });
+
+  }
+
+  // The dispatch function is called so frequently that isolatorList always has the last value appended to it
+  const handleIsolator = (isolatorName) => {
+    dispatch({
+      type: 'ADD_ISOLATOR',
+      key: sessionId,
+      isolatorName
+    });
+  };
+
+
   // Main use effect
   useEffect(() => {
-    fetchData()
-  }, []);
+    setGlobalPageLoading(true)
+    setwebsocketURL(`ws://${apiHost}/v1/ws/${navItem.generalInfo.id}`)
+    if (appConfig !== undefined) {
+      console.log("Yo Yo Current Resource Type", appConfig.currentResourceType);
+      // Call this function after 1 secon
+      setTimeout(() => {
+        onSearch(appConfig.currentResourceType)
+      }, 1000);
+    } else {
+      dubConnectAndLoadData()
+    }
+    // fetchData()
+  }, [sessionId]);
 
 
   const fetchData = async () => {
@@ -134,24 +273,27 @@ const Home: React.FC = () => {
       // setDataRows(authDataRows)
 
       // setTableName("Authentication")
-      console.log("Hi", authDataRows);
-
-      setAppConfig({
-        ...appConfig,
-        serverConfig: serverConfig,
-        currentPluginName: pluginName,
+      dispatch({
+        type: 'SET_HOME_STATE',
+        key: sessionId, // Add the sessionId as the key
+        payload: {
+          appConfig: {
+            ...appConfig,
+            serverConfig: serverConfig,
+            currentPluginName: pluginName,
+          },
+        }
       })
-
     }
   }
 
-  const loadPlugin = async (pluginName: string, serverConfig: ModelConfig) => {
-    const pluginAuths = await api.handleAuth({ pluginName: pluginName })
+  const loadPlugin = async (pName: string, serverConfig: ModelConfig) => {
+    const pluginAuths = await api.handleAuth({ pluginName: pName })
 
     if (pluginAuths?.auths?.length === 0) {
-      showNotification('error', 'No auths found', `no authentication found for default plugin ${pluginName}`)
+      showNotification('error', 'No auths found', `no authentication found for default plugin ${pName}`)
       // TODO: We should not throw an error here
-      throw new Error(`no authentication found for default plugin ${pluginName}`)
+      throw new Error(`no authentication found for default plugin ${pName}`)
     }
 
     let authDataRows: Array<object> = []
@@ -182,15 +324,15 @@ const Home: React.FC = () => {
     if (pluginAuth?.identifyingName === "") {
       // Show auth selection
       return {
-        "error": `Default authentiation not found ${pluginName}`,
+        "error": `Default authentiation not found ${pName}`,
         "authDataRows": authDataRows
       }
     }
 
-    setAppConfig({ ...appConfig, serverConfig: serverConfig, currentPluginName: pluginName } as AppState)
+    // setAppConfig({ ...appConfig, serverConfig: serverConfig, currentPluginName: pName } as AppState)
 
     try {
-      await connectAndLoadData(pluginName, pluginAuth);
+      await connectAndLoadData(pluginName, { name: contextId, identifyingName: authId } as ProtoAuthInfo);
     } catch (e) {
       console.log("Im here", authDataRows);
       return {
@@ -206,6 +348,62 @@ const Home: React.FC = () => {
   }
 
 
+  const dubConnectAndLoadData = () => {
+    try {
+      // TODO: Fix error, genrated by the server not getting catched
+      // const generalInfo = await api.handleInfo({
+      //   pluginName: pluginName, authId: pluginAuth.identifyingName, contextId: pluginAuth.name
+      // } as HandleInfoRequest)
+
+      // setDataRows(dataRows => []);
+      setCustomTable({ dataRows: [], headerRow: [], tableName: "Clearing Table..." })
+      dispatch({
+        type: 'SET_HOME_STATE',
+        key: sessionId, // Add the sessionId as the key
+        payload: {
+          appConfig: {
+            ...appConfig,
+            generalInfo: navItem.generalInfo,
+            currentIsolator: navItem.generalInfo.defaultIsolator[0],
+            currentPluginName: pluginName,
+            currentResourceType: navItem.generalInfo.isolatorType,
+          },
+          isolatorsList: [],
+          isolatorCardState: {
+            ...isolatorCardState,
+            defaultIsolator: navItem.generalInfo.defaultIsolator[0],
+            currentIsolator: navItem.generalInfo.defaultIsolator[0],
+            isolators: [],
+            frequentlyUsed: navItem.generalInfo.defaultIsolator,
+          }
+        }
+      })
+
+      setSearchOptions(s => {
+        return [...navItem.generalInfo.resourceTypes.map(type => {
+          return { value: type }
+        })]
+      })
+
+      setwebsocketURL(`ws://${apiHost}/v1/ws/${navItem.generalInfo.id}`)
+
+      // setIsolatorCardState({
+      //   ...isolatorCardState,
+      //   defaultIsolator: navItem.generalInfo.defaultIsolator[0],
+      //   currentIsolator: navItem.generalInfo.defaultIsolator[0],
+      //   isolators: [],
+      //   frequentlyUsed: navItem.generalInfo.defaultIsolator,
+      // })
+
+      // setAppConfig(a => ())
+
+      console.log("Connect & load successfully");
+
+    } catch (e) {
+      throw e;
+    }
+  }
+
   const connectAndLoadData = async (pluginName: string, pluginAuth: ProtoAuthInfo) => {
     try {
       // TODO: Fix error, genrated by the server not getting catched
@@ -215,33 +413,31 @@ const Home: React.FC = () => {
 
       // setDataRows(dataRows => []);
       setCustomTable({ dataRows: [], headerRow: [], tableName: "Clearing Table..." })
-      setIsolatorsList(isolatorsList => [])
+      // setIsolatorsList(isolatorsList => [])
 
       setSearchOptions(s => {
         return [...generalInfo.resourceTypes.map(type => {
-          return { value: type }
-        }), ...currentSettings.map(type => {
           return { value: type }
         })]
       })
 
       setwebsocketURL(`ws://${apiHost}/v1/ws/${generalInfo.id}`)
 
-      setIsolatorCardState({
-        ...isolatorCardState,
-        defaultIsolator: generalInfo.defaultIsolator[0],
-        currentIsolator: generalInfo.defaultIsolator[0],
-        isolators: [],
-        frequentlyUsed: generalInfo.defaultIsolator,
-      })
+      // setIsolatorCardState({
+      //   ...isolatorCardState,
+      //   defaultIsolator: generalInfo.defaultIsolator[0],
+      //   currentIsolator: generalInfo.defaultIsolator[0],
+      //   isolators: [],
+      //   frequentlyUsed: generalInfo.defaultIsolator,
+      // })
 
-      setAppConfig(a => ({
-        ...a,
-        generalInfo: generalInfo,
-        currentIsolator: generalInfo.defaultIsolator[0],
-        currentPluginName: pluginName,
-        currentResourceType: generalInfo.isolatorType,
-      }))
+      // setAppConfig(a => ({
+      //   ...a,
+      //   generalInfo: generalInfo,
+      //   currentIsolator: generalInfo.defaultIsolator[0],
+      //   currentPluginName: pluginName,
+      //   currentResourceType: generalInfo.isolatorType,
+      // }))
 
       console.log("Connect & load successfully");
 
@@ -303,7 +499,13 @@ const Home: React.FC = () => {
         api.handleEvent(params)
           .then(res => {
             // TODO: Show form
-            setSpecificActionFormState({ ...specificActionFormState, event: e, open: true, formItems: res.result })
+            dispatch({
+              type: 'SET_HOME_STATE',
+              key: sessionId, // Add the sessionId as the key
+              payload: {
+                specificActionFormState: { ...specificActionFormState, event: e, open: true, formItems: res.result },
+              }
+            })
             // setstate, pass res.result to form
           })
         return
@@ -338,17 +540,29 @@ const Home: React.FC = () => {
           }
 
           if (sa.output_type === "string") {
-            setDrawerState({ ...drawerState, drawerBodyType: 'editor', isDrawerOpen: true, editorOptions: { defaultText: res.result, isReadOnly: true } });
+            dispatch({
+              type: 'SET_HOME_STATE',
+              key: sessionId,
+              payload: {
+                drawerState: { ...drawerState, drawerBodyType: 'editor', isDrawerOpen: true, editorOptions: { defaultText: res.result, isReadOnly: true } },
+              }
+            })
             return
           }
 
           if (sa.output_type === "bidirectional" || sa.output_type === "stream") {
-            setDrawerState({
-              ...drawerState,
-              drawerBodyType: 'xterm',
-              isDrawerOpen: true,
-              socketUrl: `ws://${apiHost}/v1/ws/action/${appConfig?.generalInfo.id}/${res.id}`
-            });
+            dispatch({
+              type: 'SET_HOME_STATE',
+              key: sessionId,
+              payload: {
+                drawerState: {
+                  ...drawerState,
+                  drawerBodyType: 'xterm',
+                  isDrawerOpen: true,
+                  socketUrl: `ws://${apiHost}/v1/ws/action/${appConfig?.generalInfo.id}/${res.id}`
+                },
+              }
+            })
             return
           }
 
@@ -368,7 +582,13 @@ const Home: React.FC = () => {
               lineWidth: -1, // Disables line wrapping
               quotingType: '"', // Use double quotes for strings
             });
-            setDrawerState({ ...drawerState, drawerBodyType: 'editor', isDrawerOpen: true, editorOptions: { defaultText: prettyYaml, isReadOnly: true } });
+            dispatch({
+              type: 'SET_HOME_STATE',
+              key: sessionId,
+              payload: {
+                drawerState: { ...drawerState, drawerBodyType: 'editor', isDrawerOpen: true, editorOptions: { defaultText: prettyYaml, isReadOnly: true } },
+              }
+            })
           })
           .catch(err => showNotification('error', 'Failed to perform read operation', err.message))
         break;
@@ -385,9 +605,15 @@ const Home: React.FC = () => {
               quotingType: '"', // Use double quotes for strings
             });
             // console.log("here 0", tableRow);
-            setDrawerState({
-              ...drawerState, resourceName: e.resourceName, drawerBodyType: 'editor', isDrawerOpen: true, editorOptions: { defaultText: prettyYaml, isReadOnly: false }, appConfig: appConfig
-            });
+            dispatch({
+              type: 'SET_HOME_STATE',
+              key: sessionId,
+              payload: {
+                drawerState: {
+                  ...drawerState, resourceName: e.resourceName, drawerBodyType: 'editor', isDrawerOpen: true, editorOptions: { defaultText: prettyYaml, isReadOnly: false }, appConfig: appConfig
+                },
+              }
+            })
           })
           .catch(err => showNotification('error', 'Failed to perfrom edit operation', err.message))
         break;
@@ -399,26 +625,13 @@ const Home: React.FC = () => {
 
       case "use" as ModelFrontendEventNameEnum:
         console.log("Frequency used", isolatorCardState.frequentlyUsed);
-        setIsolatorCardState((prevState) => {
-
-
-          const resultSet = new Set(appConfig.generalInfo.defaultIsolator);
-
-          // Add newIsolator to resultSet
-          resultSet.add(e.resourceName)
-
-          // Add frequentlyUsedIsolators to resultSet
-          prevState.frequentlyUsed.forEach((isolator) => resultSet.add(isolator));
-
-          // return Array.from(resultSet);
-
-          // const isResourceAlreadyInFrequentlyUsed = prevState.isolators.find((item) => item === e.resourceName);
-
-          return {
-            ...prevState,
-            frequentlyUsed: Array.from(resultSet)
-          };
-        });
+        dispatch({
+          type: 'SET_HOME_STATE',
+          key: sessionId, // Add the sessionId as the key
+          payload: {
+            isolatorCardState: getFrequentlyUsed(e.resourceName)
+          }
+        })
 
         break;
 
@@ -443,6 +656,26 @@ const Home: React.FC = () => {
       default:
         break;
     }
+  }
+
+  const getFrequentlyUsed = (value) => {
+
+    const resultSet = new Set(appConfig.generalInfo.defaultIsolator);
+
+    // Add newIsolator to resultSet
+    resultSet.add(value)
+
+    // Add frequentlyUsedIsolators to resultSet
+    isolatorCardState.frequentlyUsed.forEach((isolator) => resultSet.add(isolator));
+
+    // return Array.from(resultSet);
+
+    // const isResourceAlreadyInFrequentlyUsed = prevState.isolators.find((item) => item === e.resourceName);
+
+    return {
+      ...isolatorCardState,
+      frequentlyUsed: Array.from(resultSet)
+    };
   }
 
   const handleOnKeyBoardPress = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -480,62 +713,22 @@ const Home: React.FC = () => {
     }
   };
 
-  const onSearch = async (value: string) => {
-    console.log("Search result is", value);
 
+  const getRecentlyUsed = (value: string) => {
+    // If the selected item is already in the list, remove it so it can be added to the front
+    const updatedRecentlyUsedItems = recentlyUsedItems.filter(
+      (item) => item !== value
+    );
 
-    if (value.startsWith(settingPlugin)) {
-      const pluginName = parsePluginSetting(value)
+    // Add the selectedItem to the front of the array
+    updatedRecentlyUsedItems.unshift(value);
 
-      handleOnResourceEvent({ eventType: "internal-action", name: "close", pluginName: appConfig.currentPluginName } as ModelFrontendEvent)
-      const obj = await loadPlugin(pluginName, appConfig.serverConfig)
-      if (obj.error !== "") {
-        showNotification('error', `Failed to load ${pluginName} plugin or connection failure`, obj.error.message)
-        setCustomTable({
-          dataRows: obj.authDataRows,
-          headerRow: authTablecolumns,
-          tableName: "authentication",
-        })
-        // setHeaderRow(authTablecolumns)
-        // setDataRows(obj.authDataRows)
-        // setTableName("Authentication")
-      }
-      return
+    // Limit the length of the array to 5 items
+    if (updatedRecentlyUsedItems.length > 5) {
+      updatedRecentlyUsedItems.pop();
     }
 
-    if (value.startsWith(settingAuthentication)) {
-      const parseResult = parseAuthenticationSetting(value)
-      console.log("parseResult", parseResult);
-
-
-      handleOnResourceEvent({ eventType: "internal-action", name: "close", pluginName: appConfig.currentPluginName } as ModelFrontendEvent)
-
-      connectAndLoadData(appConfig.currentPluginName, { identifyingName: parseResult.identifyingName, name: parseResult.name } as ProtoAuthInfo)
-      return
-    }
-
-    const event: ModelFrontendEvent = {
-      eventType: "internal-action",
-      name: "resource-type-change",
-      isolatorName: appConfig?.currentIsolator,
-      pluginName: appConfig?.currentPluginName,
-      resourceName: "",
-      resourceType: value.toLowerCase(),
-      args: {},
-    }
-
-    handleOnResourceEvent(event)
-    setCustomTable({ dataRows: [], headerRow: [], tableName: value.toLowerCase() })
-    // setDataRows(() => [])
-    // setTableName(value.toLowerCase())
-    setAppConfig({ ...appConfig, currentResourceType: value.toLowerCase() })
-    // appConfig.currentResourceType = value.toLowerCase()
-    // setHideSearchBar(true);
-    focusOnTable()
-    // Clearing search bar
-    // setSearchValue("")
-    // setSelectedValue('');
-    // TODO: Clear table
+    return updatedRecentlyUsedItems;
   }
 
   const handleNamespaceChange = (value: string) => {
@@ -553,11 +746,26 @@ const Home: React.FC = () => {
     // setDataRows(dataRows => []);
     setCustomTable({ dataRows: [], headerRow: [], tableName: appConfig?.currentResourceType })
     handleOnResourceEvent(event)
-    setIsolatorCardState({
-      ...isolatorCardState,
-      currentIsolator: value,
+    dispatch({
+      type: 'SET_HOME_STATE',
+      key: sessionId, // Add the sessionId as the key
+      payload: {
+        isolatorCardState: {
+          ...isolatorCardState,
+          currentIsolator: value,
+        }
+      }
     })
-    appConfig.currentIsolator = value
+    dispatch({
+      type: 'SET_HOME_STATE',
+      key: sessionId, // Add the sessionId as the key
+      payload: {
+        appConfig: {
+          ...appConfig,
+          currentIsolator: value
+        },
+      }
+    })
   };
 
   const onNamespaceChange = (value) => {
@@ -565,14 +773,11 @@ const Home: React.FC = () => {
     handleNamespaceChange(value)
   }
 
-  const [isolatorCardState, setIsolatorCardState] = useState<InfoCardPropsTypes>({} as InfoCardPropsTypes)
-
   const myInputRef = useRef(null);
   const focusOnTable = () => {
     myInputRef.current.focus();
   };
 
-  const [tableRow, setTableRow] = useState()
 
   const handleTableRowClick = (record: any) => {
     setTableRow(record)
@@ -580,11 +785,15 @@ const Home: React.FC = () => {
 
   const handleOnSpecificActionOKButtonClick = (event: ModelFrontendEvent) => {
     handleOnResourceEvent(event, true)
-    setSpecificActionFormState(p => {
-      return {
-        ...p,
-        formItems: {},
-        open: false,
+    dispatch({
+      type: 'SET_HOME_STATE',
+      key: sessionId, // Add the sessionId as the key
+      payload: {
+        specificActionFormState: {
+          ...specificActionFormState,
+          formItems: {},
+          open: false,
+        },
       }
     })
   }
@@ -593,7 +802,6 @@ const Home: React.FC = () => {
     // Combine the resourceTypes and currentSettings into a single array
     const list = [
       ...appConfig.generalInfo.resourceTypes,
-      ...currentSettings,
     ];
 
     // Configure Fuse.js options
@@ -619,108 +827,142 @@ const Home: React.FC = () => {
     // Perform any additional actions with the search results
   };
 
+  const handleCloseGlobalLoading = () => {
+
+    setTimeout(() => {
+      setGlobalPageLoading(false);
+    }, 500);
+  };
 
   return (
     <>
-      <SideDrawer {...drawerState} onDrawerClose={() => {
-        console.log("onDrawerClose close called 2");
-        setDrawerState({
-          ...drawerState,
-          isDrawerOpen: false,
-          appConfig: appConfig
-        })
-      }} ></SideDrawer>
-      <SpecificActionForm
-        {
-        ...specificActionFormState
-        }
-        onCancel={() => {
-          setSpecificActionFormState(p => {
-            return {
-              ...p,
-              formItems: {},
-              open: false,
-            }
-          })
-        }}
-        onSubmit={handleOnSpecificActionOKButtonClick}
-      ></SpecificActionForm >
-      <Modal title="Confirmation" open={isModalOpen} onOk={handleOnDeleteOkButtonClick} onCancel={handleOnDeleteCancelButtonClick}>
-        <p>{deleteModalMessage}</p>
-      </Modal>
-      {/* <Row style={{ "margin": "8px" }} align={"top"}> */}
-      {/* Show Info */}
-      <Row style={{ "margin": "8px" }}>
-        {appConfig && appConfig.generalInfo && <>
-          <Col>
-            <InfoCard
-              title='General Info'
-              content={appConfig.generalInfo.general}
-            />
-          </Col>
-          <Col push={1} style={{ "width": "25%" }} >
-            <IsolatorCard {...isolatorCardState} isolators={isolatorsList} onNamespaceChange={onNamespaceChange}
-            />
-          </Col>
-          <Col push={2}>
-            <InfoCard
-              title='Actions'
-              content={appConfig.generalInfo.actions.reduce((acc, curVal) => {
-                return { ...acc, [curVal.keyBinding]: curVal.name }
-              }, {})}
-            />
-          </Col>
-          <Col push={3}>
-            <InfoCard
-              title='Specific Actions'
-              content={currentResourceSpecificActions?.reduce((acc, curVal) => {
-                return { ...acc, [curVal.key_binding]: curVal.name }
-              }, {})}
-            />
-          </Col>
-        </>
-        }
-      </Row>
-      {/* Resource Table */}
-      {/* <Row style={{ "margin": "8px" }} className="row-flex-height" onKeyDown={handleOnKeyBoardPress} tabIndex={0} ref={myInputRef}> */}
-      <Row style={{ "margin": "8px" }} className="row-flex-height" tabIndex={0} ref={myInputRef}>
-        <Col flex={10} >
-          {/* {appConfig && appConfig.generalInfo && */}
-          {appConfig &&
-            <ResourceTable
-              handleTableRowClick={handleTableRowClick}
-              onEvent={handleOnResourceEvent}
-              handleResourceSpecificAction={(sas: Array<SpecificAction>) => setCurrentResourceSpecificActions(sas)}
-              handleIsolator={(isolatorName) => setIsolatorsList(isolatorsList => [...isolatorsList, isolatorName])}
-              isCurrentResourceAnIsolator={appConfig.currentResourceType === appConfig?.generalInfo?.isolatorType}
-              pluginName={appConfig.currentPluginName}
-              websocketURL={websocketURL}
-              customTable={customTable}
-              internalTable={internalTable}
-            />}
-        </Col>
-      </Row>
-      {/*  */}
-      {
-        !hideSearchBar &&
-        <Row style={{ "margin": "8px", position: 'fixed', bottom: 0, left: 0, right: 0 }} >
-          <Col span={24}>
-            {appConfig && appConfig.generalInfo &&
-              <AutoComplete
-                options={searchOptions}
-                filterOption={false}
-                style={{ width: '100%' }}
-                autoFocus={true}
-                onSelect={onSearch}
-                onSearch={handleSearch}
-                backfill={true}
-                placeholder="Search Resource Types"
-              >
-              </AutoComplete>
-            }
-          </Col>
-        </Row>
-      }
+      <Spin size='large' tip="Loading..." spinning={globalPageLoading}>
+        <Layout style={{ minHeight: '100vh' }}>
+          <SideNav selectedItem={sessionId || ""}></SideNav>
+          <Layout className="site-layout">
+            {/* <Header style={{ padding: 0 }} /> */}
+            <Content>
+              <SideDrawer {...drawerState} onDrawerClose={() => {
+                console.log("onDrawerClose close called 2");
+                dispatch({
+                  type: 'SET_HOME_STATE',
+                  key: sessionId,
+                  payload: {
+                    drawerState: {
+                      ...drawerState,
+                      isDrawerOpen: false,
+                      appConfig: appConfig
+                    },
+                  }
+                })
+              }} ></SideDrawer>
+              <SpecificActionForm
+                {
+                ...specificActionFormState
+                }
+                onCancel={() => {
+                  dispatch({
+                    type: 'SET_HOME_STATE',
+                    key: sessionId, // Add the sessionId as the key
+                    payload: {
+                      specificActionFormState: {
+                        ...specificActionFormState,
+                        formItems: {},
+                        open: false,
+                      },
+                    }
+                  })
+                }}
+                onSubmit={handleOnSpecificActionOKButtonClick}
+              ></SpecificActionForm >
+              <Modal title="Confirmation" open={isModalOpen} onOk={handleOnDeleteOkButtonClick} onCancel={handleOnDeleteCancelButtonClick}>
+                <p>{deleteModalMessage}</p>
+              </Modal>
+              {/* <Row style={{ "margin": "8px" }} align={"top"}> */}
+              {/* Show Info */}
+              <Row>
+                {appConfig && appConfig.generalInfo && <>
+                  <Col style={{ "margin": "8px" }}>
+                    <InfoCard
+                      title='General Info'
+                      content={appConfig.generalInfo.general}
+                    />
+                  </Col>
+                  <Col style={{ "margin": "8px" }}>
+                    <IsolatorCard {...isolatorCardState} isolators={isolatorsList} onNamespaceChange={onNamespaceChange}
+                    />
+                  </Col>
+                  {/* <Col push={2}>
+                  <InfoCard
+                    title='Actions'
+                    content={appConfig.generalInfo.actions.reduce((acc, curVal) => {
+                      return { ...acc, [curVal.keyBinding]: curVal.name }
+                    }, {})}
+                  />
+                </Col> */}
+                  <Col style={{ "margin": "8px" }}>
+                    <InfoCard
+                      title='Specific Actions'
+                      content={currentResourceSpecificActions?.reduce((acc, curVal) => {
+                        return { ...acc, [curVal.key_binding]: curVal.name }
+                      }, {})}
+                    />
+                  </Col>
+                  <Col style={{ "margin": "8px" }}>
+                    <RecentlyUsed
+                      title='Recently Used'
+                      recentlyUsedItems={recentlyUsedItems}
+                      onSearch={onSearch}
+                    />
+                  </Col>
+                </>
+                }
+              </Row>
+              {/* Resource Table */}
+              {/* <Row style={{ "margin": "8px" }} className="row-flex-height" onKeyDown={handleOnKeyBoardPress} tabIndex={0} ref={myInputRef}> */}
+              <Row style={{ "margin": "8px" }} className="row-flex-height" tabIndex={0} ref={myInputRef}>
+                <Col flex={10} className='resource-table-container'>
+                  {/* {appConfig && appConfig.generalInfo && */}
+                  {appConfig &&
+                    <ResourceTable
+                      handleCloseGlobalLoading={handleCloseGlobalLoading}
+                      handleTableRowClick={handleTableRowClick}
+                      onEvent={handleOnResourceEvent}
+                      handleResourceSpecificAction={(sas: Array<SpecificAction>) => setCurrentResourceSpecificActions(sas)}
+                      handleIsolator={handleIsolator}
+                      defaultIsolatorResourceType={appConfig?.generalInfo?.isolatorType}
+                      pluginName={appConfig.currentPluginName}
+                      websocketURL={websocketURL}
+                      customTable={customTable}
+                      internalTable={internalTable}
+                    />}
+                </Col>
+              </Row>
+              {/*  */}
+              {
+                !hideSearchBar &&
+                <Row style={{ position: 'fixed', bottom: 5, left: 80, right: 20 }} >
+                  <Col span={24} style={{ "margin": "0px 8px" }}>
+                    {appConfig && appConfig.generalInfo &&
+                      <AutoComplete
+                        options={searchOptions}
+                        filterOption={false}
+                        style={{ width: '100%' }}
+                        autoFocus={true}
+                        onSelect={onSearch}
+                        onSearch={handleSearch}
+                        backfill={true}
+                        placeholder="Search Resource Types"
+                      >
+                      </AutoComplete>
+                    }
+                  </Col>
+                </Row>
+              }
+            </Content>
+          </Layout>
+        </Layout>
+      </Spin>
     </>
   );
 }

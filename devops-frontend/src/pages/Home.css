@@ -1,11 +1,5 @@
-h1:where(.css-dev-only-do-not-override-1f0gajl).ant-typography {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.row-flex-height {
-  height: calc(100% - 200px);
-  /* Set the height of the second Row component to the remaining available space */
-  overflow-y: scroll;
-  /* Enable vertical scrolling within the second Row component */
+.resource-table-container {
+  height: calc(100vh - 230px);
+  /* Adjust the value 200px to the actual height of your header, footer, and other components */
+  overflow-y: auto;
 }

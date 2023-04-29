@@ -1,0 +1,87 @@
+name: Go
+on:
+  pull_request:
+    branches:
+      - master
+      - v*
+
+jobs:
+  v2:
+    name: "Version Relase"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup stage golang environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: stable
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Cache Go Modules
+        uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Setup Nodejs and npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+
+      # - name: Build Frontend
+      #   run: |
+      #     cd devops-frontend
+      #     yarn install --frozen-lockfile
+      #     yarn build
+
+      - name: Install goreleaser
+        run: |
+          wget -q https://github.com/goreleaser/goreleaser/releases/download/v1.17.2/goreleaser_Linux_x86_64.tar.gz
+          tar -xzf goreleaser_Linux_x86_64.tar.gz
+          sudo mv goreleaser /usr/local/bin/
+
+      - uses: ypicard/get-branch-name-github-action@v1
+        id: current-branch
+
+      - name: Set up Google Application Credentials
+        run: |
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}' > credentials.json
+          echo 'GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/credentials.json' >> $GITHUB_ENV
+
+      - name: Run Build and Release script
+        run: |
+          # Download Go Releaser
+          echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
+
+          # echo "Creating tag..."
+          git config --global user.email "sharadregoti15@gmail.com"
+          git config --global user.name "sharadregoti"
+          git fetch origin ${{ steps.current-branch.outputs.branch}}:${{ steps.current-branch.outputs.branch}}
+          git checkout ${{ steps.current-branch.outputs.branch}}
+          git checkout -b "temp-branch"
+          TIMESTAMP=$(date +%s)
+          git tag -a "v0.5.1" -m "dummy tag"
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+          echo "Running script..."
+          bash release.sh
+
+      # - name: Run Build and Release script
+      #   run: |
+      #     # Download Go Releaser
+      #     echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
+
+      #     # echo "Creating tag..."
+      #     git config --global user.email "sharadregoti15@gmail.com"
+      #     git config --global user.name "sharadregoti"
+      #     git fetch origin ${{ steps.current-branch.outputs.branch}}:${{ steps.current-branch.outputs.branch}}
+      #     git checkout ${{ steps.current-branch.outputs.branch}}
+      #     git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+      #     echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+      #     echo "Running script..."
+      #     bash release.sh

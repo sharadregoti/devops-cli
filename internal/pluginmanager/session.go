@@ -43,6 +43,10 @@ func (s *SessionManager) DeleteClient(ID string) {
 
 func (s *SessionManager) SetWSConn(ID string, conn *websocket.Conn) {
 	info := s.m[ID]
+	if info.c.wsConn != nil {
+		logger.LogInfo("Closing old websocket connection")
+		info.c.wsConn.Close()
+	}
 	info.c.wsConn = conn
 }
 
@@ -73,7 +77,7 @@ func (s *SessionManager) AddClient(ID, pluginName, authID, contextID string) err
 			return err
 		}
 
-		dataPipe := make(chan model.WebsocketResponse, 10)
+		dataPipe := make(chan model.WebsocketResponse, 1)
 		pCtx.SetDataPipe(dataPipe)
 
 		s.m[ID] = &sessionInfo{
