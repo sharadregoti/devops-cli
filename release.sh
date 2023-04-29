@@ -26,11 +26,11 @@
 
 # echo "Building frontend..."
 cd devops-frontend
-# # Build frontend
-# yarn
-# yarn build
-# # Create tar file
-# tar -czvf ui.tar.gz dist/
+# Build frontend
+yarn
+yarn build
+# Create tar file
+tar -czvf ui.tar.gz dist/
 
 # Build Core Binary
 echo "Building core binary..."
