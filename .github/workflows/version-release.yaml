@@ -57,8 +57,26 @@ jobs:
           git config --global user.name "sharadregoti"
           git fetch origin ${{ steps.current-branch.outputs.branch}}:${{ steps.current-branch.outputs.branch}}
           git checkout ${{ steps.current-branch.outputs.branch}}
-          git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+          git checkout -b "temp-branch"
+          TIMESTAMP=$(date +%s)
+          git tag -a "temp-tag-$TIMESTAMP" -m "dummy tag"
           echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
 
           echo "Running script..."
           bash release.sh
+
+      # - name: Run Build and Release script
+      #   run: |
+      #     # Download Go Releaser
+      #     echo "Echo: Current branch is ${{ steps.current-branch.outputs.branch}}"
+
+      #     # echo "Creating tag..."
+      #     git config --global user.email "sharadregoti15@gmail.com"
+      #     git config --global user.name "sharadregoti"
+      #     git fetch origin ${{ steps.current-branch.outputs.branch}}:${{ steps.current-branch.outputs.branch}}
+      #     git checkout ${{ steps.current-branch.outputs.branch}}
+      #     git tag -a ${{ steps.current-branch.outputs.branch}} -m "dummy tag"
+      #     echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+
+      #     echo "Running script..."
+      #     bash release.sh
