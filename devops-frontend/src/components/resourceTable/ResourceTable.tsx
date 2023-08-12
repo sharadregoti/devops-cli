@@ -1,6 +1,6 @@
 import { DeleteOutlined, DownOutlined, EditOutlined, FileAddOutlined, MoreOutlined, ReadOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
-import { Badge, Col, Dropdown, Menu, Row, Space, Table, Typography } from 'antd';
+import { Badge, Col, Dropdown, Menu, Row, Space, Table, Tooltip, Typography } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { ModelFrontendEvent, ProtoAction } from "../../generated-sources/openapi";
 import './ResourceTable.css';
@@ -164,7 +164,25 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleCloseG
         title,
         dataIndex: index,
         key: index,
-      }));
+        defaultSortOrder: 'descend',
+        sorter: (a, b) => a[index].length - b[index].length,
+        // filters: () => {
+        //   return []
+        // },
+        // filterMode: 'tree',
+        // filterSearch: true,
+        // onFilter: (value: string, record) => record[index].startsWith(value),
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (address) => (
+          <Tooltip placement="topLeft" title={address}>
+            {address}
+          </Tooltip>
+        ),
+      }
+
+      ));
 
       if (wsTableName !== message.name) {
         count = 0;
@@ -284,7 +302,7 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleCloseG
                   />
                 </Col>
 
-                {wsTableName === defaultIsolatorResourceType &&
+                {itableName === defaultIsolatorResourceType &&
                   <Col>
                     <FileAddOutlined
                       style={{ color: "gray" }}
@@ -422,7 +440,7 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleCloseG
       <Table
         title={() => (
           <center>
-            <Typography.Title style={{ margin: "8px" }} level={5}>
+            <Typography.Title style={{ padding: 0, margin: 0 }} level={5}>
               {itableName.charAt(0).toUpperCase() + itableName.slice(1)} ({idataRows.length})
             </Typography.Title>
           </center>
@@ -451,6 +469,8 @@ const ResourceTable: React.FC<ResourceTablePropsType> = ({ onEvent, handleCloseG
           };
         }}
         // scroll={{ y: 1000 }}
+        scroll={{ x: 'max-content' }}
+        // tableLayout='auto'
         pagination={false}
         // pagination={{
         //   pageSize: 100,
