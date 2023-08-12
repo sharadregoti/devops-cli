@@ -2,6 +2,14 @@
     background-color: lightskyblue;
 }
 
+/* Change background color on hover */
+tr:hover {
+    opacity: 0.5;
+}
+.ant-table-tbody>tr.ant-table-row:hover>td {
+    background: none !important;
+}
+
 .darkorange {
     background-color: darkorange;
 }

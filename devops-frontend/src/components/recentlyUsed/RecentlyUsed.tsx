@@ -25,7 +25,7 @@ const RecentlyUsed: React.FC<RecentlyUsedPropsTypes> = ({ title, recentlyUsedIte
         // display: "block",
     };
 
-    const [selectedTags, setSelectedTags] = useState<string[]>(['Books']);
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
     const handleChange = (tag: string, checked: boolean) => {
         const nextSelectedTags = checked

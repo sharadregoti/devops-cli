@@ -900,14 +900,14 @@ const Home: React.FC = () => {
                     }, {})}
                   />
                 </Col> */}
-                  <Col style={{ "margin": "8px" }}>
+                  {/* <Col style={{ "margin": "8px" }}>
                     <InfoCard
                       title='Specific Actions'
                       content={currentResourceSpecificActions?.reduce((acc, curVal) => {
                         return { ...acc, [curVal.key_binding]: curVal.name }
                       }, {})}
                     />
-                  </Col>
+                  </Col> */}
                   <Col style={{ "margin": "8px" }}>
                     <RecentlyUsed
                       title='Recently Used'
