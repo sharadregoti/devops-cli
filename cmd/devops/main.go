@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const VERSION = "0.5.2"
+const VERSION = "0.5.3"
 
 // @title NEW Devops API
 // @version v0.1.0
