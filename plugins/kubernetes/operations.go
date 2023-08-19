@@ -403,6 +403,36 @@ func (d *Kubernetes) listResources(ctx context.Context, args *proto.GetResources
 	return result, nil
 }
 
+func nodeStatus(conds []v1.NodeCondition, exempt bool) string {
+	res := make([]string, 0)
+	conditions := make(map[v1.NodeConditionType]*v1.NodeCondition, len(conds))
+	for n := range conds {
+		cond := conds[n]
+		conditions[cond.Type] = &cond
+	}
+
+	validConditions := []v1.NodeConditionType{v1.NodeReady}
+	for _, validCondition := range validConditions {
+		condition, ok := conditions[validCondition]
+		if !ok {
+			continue
+		}
+		neg := ""
+		if condition.Status != v1.ConditionTrue {
+			neg = "Not"
+		}
+		res = append(res, neg+string(condition.Type))
+	}
+	if len(res) == 0 {
+		res = append(res, "Unknown")
+	}
+	if exempt {
+		res = append(res, "SchedulingDisabled")
+	}
+
+	return strings.Join(res, ",")
+}
+
 // Phase reports the given pod phase.
 func Phase(po *v1.Pod) string {
 	status := string(po.Status.Phase)

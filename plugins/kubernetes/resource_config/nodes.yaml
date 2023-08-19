@@ -1,0 +1,78 @@
+operations:
+  - name: "namespace"
+    json_paths:
+      - path: "metadata.namespace"
+    output_format: ""
+  - name: "name"
+    json_paths:
+      - path: "metadata.name"
+    output_format: ""
+  - name: "status"
+    json_paths:
+      - path: "devops.customCalculatedStatus"
+    output_format: ""
+  - name: "version"
+    json_paths:
+      - path: "status.nodeInfo.kubeletVersion"
+    output_format: ""
+  - name: "pods"
+    json_paths:
+      - path: "status.capacity.na"
+      - path: "status.capacity.pods"
+    output_format: "%v/%v"
+  - name: "age"
+    json_paths:
+      - path: "metadata.creationTimestamp|@age"
+    output_format: ""
+styles:
+  - row_background_color: darkorange
+    conditions:
+      - 'devops.customCalculatedStatus == "SchedulingDisabled" || devops.customCalculatedStatus == "Ready,SchedulingDisabled" || devops.customCalculatedStatus == "Not Ready,SchedulingDisabled"'
+  - row_background_color: mediumpurple
+    conditions:
+      - 'devops.customCalculatedStatus == "Terminating"'
+  - row_background_color: lightskyblue
+    conditions:
+      - 'devops.customCalculatedStatus == "Ready"'
+  - row_background_color: red
+    conditions:
+      - "true"
+specific_actions:
+  - name: "describe"
+    key_binding: "d"
+    execution:
+      cmd: |
+        #!/bin/bash
+        kubectl describe {{.resourceType}} {{.resourceName}} -n "{{.isolatorName}}" --kubeconfig {{.authPath}} --context {{.authName}}
+    output_type: "string"
+  - name: "cordon"
+    key_binding: "c"
+    execution:
+      cmd: |
+        #!/bin/bash
+        kubectl cordon {{.resourceName}} --kubeconfig {{.authPath}} --context {{.authName}}
+    output_type: "nothing"
+  - name: "uncordon"
+    key_binding: "c"
+    execution:
+      cmd: |
+        #!/bin/bash
+        kubectl uncordon {{.resourceName}} --kubeconfig {{.authPath}} --context {{.authName}}
+    output_type: "nothing"
+  - name: "drain"
+    key_binding: "c"
+    execution:
+      cmd: |
+        #!/bin/bash
+        kubectl drain {{.resourceName}} --delete-emptydir-data={{.args.deleteLocalData}} --force={{.args.force}} --grace-period={{.args.gracePeriod}}  --ignore-daemonsets={{.args.ignoreDaemonSets}}  --kubeconfig {{.authPath}} --context {{.authName}}
+      user_input:
+        required: true
+        args:
+          # The below template returns the first container port of the first container of the pod
+          gracePeriod: "-1"
+          ignoreDaemonSets: "false"
+          deleteLocalData: "false"
+          force: "false"
+      server_input:
+        required: false
+    output_type: "string"

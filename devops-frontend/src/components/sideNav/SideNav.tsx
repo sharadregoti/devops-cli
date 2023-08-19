@@ -1,7 +1,8 @@
 import { Menu, MenuProps } from "antd"
 import Sider from "antd/es/layout/Sider"
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import Icon, { HomeOutlined } from '@ant-design/icons';
 import { NavBarItem, NavBarState } from "../../redux/reducers/PluginSelectorReducer";
 import {
     PieChartOutlined, AppstoreFilled, RightCircleFilled
@@ -16,6 +17,10 @@ export type SideNavProps = {
     newNavItem?: NavBarItem
 }
 
+
+import kubernetesImage from '../../assets/kubernetes32.png';
+import helmImage from '../../assets/helmicon-32.png';
+
 const SideNav: React.FC<SideNavProps> = ({ selectedItem, newNavItem }) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
@@ -23,16 +28,20 @@ const SideNav: React.FC<SideNavProps> = ({ selectedItem, newNavItem }) => {
     const [collapsed, setCollapsed] = useState(true);
     const [navBarItems, setNavBarItems] = useState<MenuItem[]>([])
 
+
     function getNavBarItem(
         auhtId: string,
         pluginName: string,
         label: React.ReactNode,
         key: React.Key,
         children?: MenuItem[],
+        icon?: ReactNode,
     ): MenuItem {
         return {
+            // <img src={pluginName === "kubernetes" ? kubernetesImage : helmImage} />
+            style: { "display": "flex", "align-items": "center" },
             key,
-            icon: label === "Plugins" ? <AppstoreFilled /> : <RightCircleFilled />,
+            icon: label === "Plugins" ? <AppstoreFilled /> : <img src={pluginName === "kubernetes" ? kubernetesImage : helmImage} />,
             children,
             label: label === "Plugins" ? label : `${pluginName} :: ${auhtId} :: ${label}`,
             onClick: () => {

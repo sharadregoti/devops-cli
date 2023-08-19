@@ -61,7 +61,8 @@ func (d *Kubernetes) Connect(authInfo *proto.AuthInfo) error {
 	// List all supported resources
 	resources, err := clientset.Discovery().ServerPreferredResources()
 	if err != nil {
-		return fmt.Errorf("failed to discover kubernetes resource types: %w", err)
+		shared.LogDebug("failed to discover kubernetes resource types: %w", err)
+		// return fmt.Errorf("failed to discover kubernetes resource types: %w", err)
 	}
 
 	// Resource Type List
@@ -220,6 +221,16 @@ func (d *Kubernetes) WatchResources(args *proto.GetResourcesArgs) (chan shared.W
 					}
 					rawJson["devops"] = map[string]interface{}{
 						"customCalculatedStatus": Phase(obj.(*v1.Pod)),
+					}
+				}
+				if args.ResourceType == "nodes" {
+					obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(b, nil, nil)
+					if err != nil {
+						shared.LogError("Watcher routine: failed to unstructure resource: %v", err)
+						return
+					}
+					rawJson["devops"] = map[string]interface{}{
+						"customCalculatedStatus": nodeStatus(obj.(*v1.Node).Status.Conditions, obj.(*v1.Node).Spec.Unschedulable),
 					}
 				}
 
